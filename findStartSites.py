@@ -1,16 +1,29 @@
 import sys
 import pandas as pd
 import numpy as np
+import os
 
 def findStartSites(CDNAcsv, output_file):
-    """function to identify the first exon of the transcript based on strand
+    """function to identify the first exon of the transcript based on strand and also outputs the cDNA sequences into a new folder
     Input - 
     cDNAcsv - csv file output by WormMineCDNAsearch.py
     
-    Output -
-    output_file - csv file with just the start of the first exon
+    output_file - csv file with name, chrom, start-50, end (for looking for guides) to be saved
+
+    Ouput - 
+
+    output_file - with details added
+
+    output_cDNAs - cDNA sequences saved into a folder called 'cDNA_sequences'
     """
 
+    #check if already outputDir
+    outputDir = os.path.join(os.path.dirname(CDNAcsv), 'cDNA_sequences')
+    #if not make a new directory
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
+
+    #import CDNAseqeunces from CDNAsearch
     inputDF = pd.read_csv(CDNAcsv)
 
     worms = list(np.unique(inputDF['Protein.CDSs.gene.primaryIdentifier']))
@@ -33,9 +46,12 @@ def findStartSites(CDNAcsv, output_file):
             temp['end'] = int(temp['start']-250)
         startExons = startExons.append(temp.to_frame().transpose())
         
+        with open(os.path.join(outputDir, temp['name'] + '_cDNA.ape'), 'w+') as fopen:
+            fopen.write(t.iloc[0]['Protein.CDSs.transcripts.sequence.residues'])
+
         del temp	
         
-        startExons.to_csv(output_file, index=False)
+    startExons.to_csv(output_file, index=False)
         
 if __name__ == '__main__':
     CDNAcsv = sys.argv[1]

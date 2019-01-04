@@ -25,10 +25,10 @@ def gDNA_download(GenomeLocs, output_dir):
 		end = r['Gene.locations.end']
 
 		cmd = './twoBitToFa http://hgdownload.cse.ucsc.edu/gbdb/ce11/ce11.2bit ' + \
-		os.path.join(output_dir, r['Gene.symbol'] + '.fa')
+		os.path.join(output_dir, r['Gene.symbol'] + '_gDNA.fa')
 		cmd += ' -seq=chr'+ r['Gene.chromosome.primaryIdentifier']
-		cmd += ' -start=' + str(r['Gene.locations.start'])
-		cmd += ' -end=' + str(r['Gene.locations.end'])
+		cmd += ' -start=' + str(int(r['Gene.locations.start']))
+		cmd += ' -end=' + str(int(r['Gene.locations.end']))
 		print (cmd)
 
 		os.system (cmd)
