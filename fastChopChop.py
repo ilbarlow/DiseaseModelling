@@ -29,7 +29,7 @@ def fastChopChop(input_coords, extra_inputs):
 			start = str(r.start)
 			end = str(r.end)
 
-		cmd = './chopchop.py -G ce11 -P -o ' + os.path.join(outputDir,r['name']) 
+		cmd = './chopchop.py -G ce11 -o ' + os.path.join(outputDir,r['name']) 
 		cmd+= ' ' + r.chrom + ':' + start + '-' + end + ' '
 		if extra_inputs >0:
 			for item in extra_inputs:

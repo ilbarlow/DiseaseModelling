@@ -13,15 +13,15 @@ import sys
 import pandas as pd
 
 
-def FeaturesGen(ChopChopresults, outputDir, gRNA_type):
+def FeaturesGen(ChopChopresults, outputDir, sgRNA_type):
     """ function to aggregate the sgRNA search results
     Input:
         ChopChopresult - results folder generated from ChopChop
         outputDir - directory into which the features.txt file should be saved
-        gRNA_type - 'General'/'GG'/'GA' to determine colouring of features
-            General: magenta + green
-            GA: cyan + blue
-            GG: yellow + red
+        sgRNA_type - 'General'/'GG'/'GA' to determine colouring of features
+            General: pink + green
+            GA: cyan + cornflower blue
+            GG: yellow + plum
     Output:
         features.txt file containin the tab delimited features for importing into Ape"""
     
@@ -40,19 +40,19 @@ def FeaturesGen(ChopChopresults, outputDir, gRNA_type):
                         guide = f.readlines()
                     #add them to a dataframe
                     temp = pd.Series()
-                    temp['guideNo'] = target.split('.')[0]
+                    temp['guideNo'] = target.split('.')[0] + sgRNA_type
                     temp['guideSeq'] = guide.pop(0).rstrip()
                     
                     saveDF = saveDF.append(temp.to_frame().transpose())
             saveDF['type'] = 'sgRNA'
             
-            if gRNA_type == 'General' or gRNA_type == None:
+            if sgRNA_type == 'General' or sgRNA_type == None:
                 saveDF['fwd'] = 'pink'
                 saveDF['rev'] = 'green'
-            elif gRNA_type == 'GG':
+            elif sgRNA_type == 'GG':
                 saveDF['fwd'] = 'yellow'
                 saveDF['rev'] = 'plum'
-            elif gRNA_type == 'GA':
+            elif sgRNA_type == 'GA':
                 saveDF['fwd'] = 'cyan'
                 saveDF['rev'] = 'cornflower blue'
                 
@@ -66,8 +66,8 @@ def FeaturesGen(ChopChopresults, outputDir, gRNA_type):
 if __name__  == '__main__':
     ChopChopresults = sys.argv[1]
     outputDir = sys.argv[2]
-    gRNA_type = sys.argv[3]
+    sgRNA_type = sys.argv[3]
     
-    FeaturesGen(ChopChopresults, outputDir, gRNA_type)
+    FeaturesGen(ChopChopresults, outputDir, sgRNA_type)
         
         
