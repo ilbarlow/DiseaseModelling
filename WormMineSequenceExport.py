@@ -107,10 +107,10 @@ def WormMineSequenceExport(inputIDs, margin, outputDir, createFASTA):
         temp['name'] = t.iloc[0]['Gene.name']
         temp['chrom'] = 'chr'+t.iloc[0]['Gene.chromosome.primaryIdentifier']     
         #find if first exon is at beginning or end of locations - this depends on the strand
-        if sum(t['Gene.CDSs.transcripts.exons.locations.strand'] == 1) == t.shape[0]:
+        if (t['Gene.CDSs.transcripts.exons.locations.strand'] == '1').sum() == t.shape[0]:
             temp['start'] = int(t['Gene.CDSs.transcripts.exons.locations.start'].min()-margin[0])
             temp['end'] = int(temp['start']+margin[1])
-        elif sum(t['Gene.CDSs.transcripts.exons.locations.strand'] == -1) == t.shape[0]:
+        elif (t['Gene.CDSs.transcripts.exons.locations.strand'] == '-1').sum() == t.shape[0]:
             temp['start'] = int(t['Gene.CDSs.transcripts.exons.locations.end'].max()+margin[0])
             temp['end'] = int(temp['start']-margin[1])
         startExons = startExons.append(temp.to_frame().transpose())
