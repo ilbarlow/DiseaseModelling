@@ -9,6 +9,8 @@ import os
 import io
 service = Service("http://intermine.wormbase.org/tools/wormmine/service")
 
+#sys.path.insert(0, '/Users/ibarlow/Documents/GitHub/pythonScripts/WormMine')
+
 def wormMinetoFASTA(inputfile):
     """ function to generate FASTA.txt file that can be used for protein alignments"""
 
@@ -74,6 +76,9 @@ def WormMineSequenceExport(inputIDs, margin, outputDir, createFASTA):
     print (IDs)
 
     #look for CEID or WormBaseID in query and add to a dataframe
+    # loop over rows instead first or find more efficient way of finding wormbase
+    # IDs or extract positions of IDs and load positions
+    # is there a way of storing the database locally
     input_DF = pd.DataFrame()
     for item in IDs:
         print ('Finding ' + item)
