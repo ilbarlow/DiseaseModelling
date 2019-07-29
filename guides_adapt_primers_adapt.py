@@ -4,18 +4,20 @@ and to add adapters for the MiSeq primers"""
 import sys
 import pandas as pd
 
-def guidesAdapt_primersAdapt(input_sgRNAs, outputfile):
+def guidesAdapt_primersAdapt(input_sgRNAs, outputfile, adapt_primers):
     """ adapts the guides according to their 5' end:
     T7 polymerase if GG and
     SP6 polymerase if GA
 
     Input
-    input_sgRNAs - .csv with columns 'target_site', 'fwd_primer', 'rev_primer',
+    input_sgRNAs - .csv with columns 'gene', target_site', 'fwd_primer', 'rev_primer',
     'size', 'Tm', 'Type', 'sgRNA_no'
     
-    Output
-    outputfile - .csv containing sgRNAs and MiSeq primers"""
+    outputfile - .csv containing sgRNAs and MiSeq primers
     
+    adapt_primers = Bool
+    """
+
     inputDF = pd.read_csv(input_sgRNAs)
 
     SP6promoter = 'ATTTAGGTGACACTATA'
@@ -45,28 +47,43 @@ def guidesAdapt_primersAdapt(input_sgRNAs, outputfile):
             sgRNA = SP6promoter + r.target_site.upper()[:-3] + crRNA
             promoter = 'SP6'
 
-        fwd_primer = MiSeqFwd + r.fwd_primer.upper()
-        rev_primer = MiSeqRev + r.rev_primer.upper()
+        if adapt_primers:
+            fwd_primer = MiSeqFwd + r.fwd_primer.upper()
+            rev_primer = MiSeqRev + r.rev_primer.upper()
        
+            
+        else:
+            try:
+                fwd_primer=r.fwd_primer.upper()
+            except Exception as error:
+                print (error)
+                fwd_primer = ''
+            try:
+                rev_primer = r.rev_primer.upper()
+            except Exception as error:
+                print (error)
+                rev_primer = ''
+
         oligos.append((r.gene.replace('-', '') + '_' + promoter, sgRNA, fwd_primer, rev_primer))
-   
-    #make into a dataframe to mave a two-column csv
-    names = ['_guide', '_MiSeqFwd', '_MiSeqRev']
-    oligo_order = pd.DataFrame()
-    for g in range(1,4):
-        temp = pd.DataFrame()
-        temp['sequence'] = [i[g] for i in oligos]
-        temp ['oligo_name'] = [i[0]+names[g-1] for i in oligos]
-        oligo_order = oligo_order.append(temp)
-        del temp
+        names = ['_guide', '_Fwd', '_Rev']
+        oligo_order = pd.DataFrame()
+        for g in range(1,len(names)+1):
+            temp = pd.DataFrame()
+            temp['sequence'] = [i[g] for i in oligos]
+            temp ['oligo_name'] = [i[0]+names[g-1] for i in oligos]
+            oligo_order = oligo_order.append(temp)
+            del temp
         
     oligo_order= oligo_order.reset_index(drop=True)
     
     #save to csv
     oligo_order.to_csv(outputfile, index=False)
     
+    return
+
 if __name__ == '__main__':
     input_sgRNAs = sys.argv[1]
     outputfile = sys.argv[2]
+    adapt_primers = sys.argv[3]
     
-    guidesAdapt_primersAdapt(input_sgRNAs, outputfile)
+    guidesAdapt_primersAdapt(input_sgRNAs, outputfile, adapt_primers)
