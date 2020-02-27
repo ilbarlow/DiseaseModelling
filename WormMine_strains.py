@@ -129,7 +129,7 @@ if __name__ == '__main__':
     if sequences:
         findSequences(inputIDs, outputFile)
 
-    elif strains:
+    if strains:
         findStrains(inputIDs, outputFile)
     
 
