@@ -11,50 +11,57 @@ script to find which files are missing from my hard drive
 
 from pathlib import Path
 import pandas as pd
-from tierpsytools.hydra.hydra_filenames_helper import find_imgstore_videos
-from tierpsytools.hydra.masked_videos_checks import *
+from tierpsytools.hydra.hydra_filenames_helper import find_imgstore_videos, raw_to_masked, raw_to_featuresN
+import datetime
 
-N_VIDEOS = 180
-id_string = 'disease_models*'
+HD_DIR = Path('/Volumes/AshurPro2/DiseaseScreen')
+BEHAV_DIR = Path('/Volumes/behavgenom$/Ida/Data/Hydra/DiseaseScreen')
 
-HD_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen/MaskedVideos')
+#%%
+def check_masked_results(df):
+    df['masked_vid'] = df.full_path.apply(raw_to_masked)
+    df['missing_masked'] = df.masked_vid.apply(lambda x: not x.exists())
+    df['results'] = df.full_path.apply(raw_to_featuresN)
+    df['missing_results'] = df.results.apply(lambda x: not x.exists())
+    return df
 
-BEHAV_DIR = Path('/Volumes/behavgenom$/Ida/Data/Hydra/DiseaseScreen/MaskedVideos')
+#%%
+# df = find_imgstore_videos(BEHAV_DIR)
+# behav_genom_df = check_masked_results(df)
+# behav_genom_df.to_csv(BEHAV_DIR / 'AuxiliaryFiles' / \
+#           '{}_checked_files.csv'.format(
+#               datetime.datetime.today().strftime('%Y%m%d'))
+#           )
+# missing_files = behav_genom_df[behav_genom_df.all(axis=1)]
+# missing_files.to_csv(BEHAV_DIR / 'AuxiliaryFiles' /\
+#                      '{}_missing_files.csv'.format(
+#                          datetime.datetime.today().strftime('%Y%m%d')))
 
-date_dirs = list(HD_DIR.glob('2020*'))
+#%% load behavgenom results
+behavgenom_df = pd.read_csv('/Volumes/behavgenom$/Ida/Data/Hydra/DiseaseScreen/AuxiliaryFiles/20200914_checked_files.csv',
+                            index_col=False)
+df = behavgenom_df.drop(columns = ['Unnamed: 0',
+                                   'masked_vid',
+                                   'missing_masked',
+                                   'results',
+                                   'missing_results'])
 
-stim_types = ['bluelight', 'prestim', 'poststim']
+#%% and do checks against external hard drive
+SAVE_HD = HD_DIR / 'AuxiliaryFiles'
+SAVE_HD.mkdir(exist_ok=True)
 
-for d in date_dirs:
-    for s in stim_types:
-        prestim = get_prestim_videos(d, bluelight=s)
-        check_all_videos(prestim, d, bluelight=s)
-        
-        prestim.to_csv(d.parent.parent / 'AuxiliaryFiles' / d.stem / \
-                       '{}_{}_masked_videos_to_check.csv'.format(d.stem, s),
-                       index=False)
+hd_df = df.copy()
+hd_df['full_path'] = hd_df.full_path.apply(lambda x: str(x).replace(str(BEHAV_DIR),
+                                                                    str(HD_DIR)))
+hd_df = check_masked_results(hd_df)
+hd_df.to_csv(SAVE_HD / '{}_checked_files.csv'.format(
+                 datetime.datetime.today().strftime('%Y%m%d')),
+             index=False
+             )
 
-
-# missing_files = []
-# for d in date_dirs:
-#     if len(list(d.glob('disease_models*'))) != N_VIDEOS:
-#         missing_files.append(d)
-
-# files_to_find = [Path(str(d).replace('Ashur Pro2', 'behavgenom$/Ida/Data/Hydra'))
-#                  for d in missing_files]
-
-# missing = []
-# for f in missing_files:
-#     behav_dir = Path(str(f).replace('Ashur Pro2', 'behavgenom$/Ida/Data/Hydra'))
-#                             )
-#     behav_files = set(Path(str(f).replace('Ashur Pro2',
-#                                            'behavgenom$/Ida/Data/Hydra')
-#                             ).glob(id_string))
-    
-#     hd_files = set(f.glob(id_string))
-#     hd_files = [str(h) for h in hd_files]
-    
-#     missing.append(set(behav_files).symmetric_difference(hd_files))
-
-    
-    
+missing_files_hd = hd_df[hd_df.all(axis=1)]
+missing_files_hd.to_csv(HD_DIR / 'AuxiliaryFiles' /\
+                     '{}_missing_files.csv'.format(
+                         datetime.datetime.today().strftime('%Y%m%d')),
+                     index=False
+                     )

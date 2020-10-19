@@ -14,12 +14,13 @@ from pathlib import Path
 import re
 
 from tierpsytools.hydra.compile_metadata import populate_96WPs,\
-    merge_robot_metadata, merge_robot_wormsorter, get_day_metadata,\
-    concatenate_days_metadata, day_metadata_check, number_wells_per_plate
+    get_day_metadata, concatenate_days_metadata, day_metadata_check, \
+        number_wells_per_plate
 
 date_regex = r"\d{8}"
 
 PROJECT_DIRECTORY = Path('/Volumes/behavgenom$/Ida/Data/Hydra/DiseaseScreen')
+
 
 #%%
 if __name__ == '__main__':
@@ -45,7 +46,7 @@ if __name__ == '__main__':
                                         del_if_exists=True,
                                         saveto='default')
 
-#%%
+
         metadata_file = day / '{}_day_metadata.csv'.format(exp_date)
 
         print('Generating day metadata: {}'.format(
@@ -61,9 +62,30 @@ if __name__ == '__main__':
         number_wells_per_plate(day_metadata, day)
 
 # %%
+    import datetime
     # combine all the metadata files
-    concatenate_days_metadata(PROJECT_DIRECTORY / 'AuxiliaryFiles',
-                              list_days=None,
-                              saveto=None)
+    concat_meta = concatenate_days_metadata(PROJECT_DIRECTORY / 'AuxiliaryFiles',
+                                            list_days=None,
+                                            saveto=None)
+    
+    
+    concat_meta_grouped = concat_meta.groupby('worm_gene')
 
+    strains = pd.DataFrame(concat_meta_grouped.apply(lambda x: x.drop_duplicates(subset='worm_strain')))
+    strains.reset_index(drop=True,
+                        inplace=True)
+    
+    strains = strains[['worm_gene',
+                        'worm_strain',
+                        'worm_code',
+                        'date_yyyymmdd']]
+ 
+    strains.to_csv(PROJECT_DIRECTORY / \
+                   '{}_strain_name_errors.csv'.format(
+                       datetime.datetime.today().strftime('%Y%m%d')
+                       ),
+                   index=False)
+        
+        
+    
 
