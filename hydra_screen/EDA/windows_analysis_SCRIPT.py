@@ -42,7 +42,7 @@ from sklearn.decomposition import PCA
 
 # analysis type
 subgroup = 'neuromodels'
-k_feat = True
+k_feat = False
 pairwise_stats = False
 
 PROJECT_DIR = Path('/Volumes/behavgenom$/Ida/Data/Hydra/DiseaseScreen/Results/window_summaries')
@@ -136,8 +136,8 @@ if __name__ =='__main__':
                                              'imaging_plate_id',
                                              'instrument_name',
                                              'imaging_date_yyyymmdd']]
-    nan_worms.to_csv(SAVETO / 'nan_worms.csv',
-                      index=False)
+    # nan_worms.to_csv(SAVETO / 'nan_worms.csv',
+    #                   index=False)
 
     feat = feat.drop(index=nan_worms.index)
     meta = meta.drop(index=nan_worms.index)
@@ -284,7 +284,7 @@ if __name__ =='__main__':
         gene_locs = bluelight_features.query('@g in worm_gene').index
         
         window_feats, scores, support = k_significant_feat(bluelight_features.loc[gene_locs, long_featlist],
-                                                           bluelight_features.loc[gene_locs, 'window'].values,
+                                                           bluelight_features.loc[gene_locs, 'window_light'].values,
                                                            k=20,
                                                            plot=False)
 
@@ -297,7 +297,7 @@ if __name__ =='__main__':
                                 order=bluelight_window_dict.keys(),
                                 hue='worm_gene',
                                 showfliers=False,
-                                linestylse=['-'],
+                                linestyle=['-'],
                                 ci=95,
                                 palette=[cmap[c],
                                          cmap[n2_index]])
@@ -311,7 +311,108 @@ if __name__ =='__main__':
             plt.savefig(SAVETO / '{}_window_comparisons'.format('bluelight') / g / '{}.png'.format(w))
             plt.close('all')
  
+#%% plot motion mode fractions for each window - follow up from the Luigi's ts analysis
+    motion_feats = [f for f in long_featlist if 'motion_mode' in f]
+    
+    (SAVETO / '{}_window_comparisons'.format('bluelight') / 'motion_modes').mkdir(exist_ok=True)
 
+    for c, g in enumerate(neuro_genes):
+        gene_locs = bluelight_features.query('@g in worm_gene').index
+        (SAVETO / '{}_window_comparisons'.format('bluelight') / 'motion_modes' / g).mkdir(exist_ok=True)
+
+        for m in motion_feats:
+            plt.figure()
+            ax = sns.pointplot(x='window',
+                              y=m,
+                              data=bluelight_features.loc[gene_locs.append(N2_locs)],
+                              order=bluelight_window_dict.keys(),
+                                hue='worm_gene',
+                                showfliers=False,
+                                linestyle=['-'],
+                                ci=95,
+                                palette=
+                                [cmap[c],
+                                         cmap[n2_index]])
+            y_min = ax.axes.get_ylim()[0]
+            y_max = ax.axes.get_ylim()[1]
+            rects = (patches.Rectangle((0.5, y_min), 1, y_max, facecolor='b', alpha=0.3),
+                     patches.Rectangle((3.5, y_min), 1, y_max, facecolor='b', alpha=0.3),
+                     patches.Rectangle((6.5, y_min), 1, y_max, facecolor='b', alpha=0.3))
+
+            [ax.add_patch(r) for r in rects]
+            plt.savefig(SAVETO / '{}_window_comparisons'.format('bluelight') / 'motion_modes' / g / '{}.png'.format(m))
+            plt.close('all')
+
+#%% plot only w_paused features
+
+    paused_feats = [f for f in long_featlist if 'w_paused' in f]
+
+    (SAVETO / 'pairwise_stats_test').mkdir(exist_ok=True)
+    (SAVETO / 'pairwise_stats_test' / 'paused_feats').mkdir(exist_ok=True)
+    
+    candidate_genes = ['unc-77',
+                       'unc-80',
+                       'nca-2']
+    
+    bluelight_fainters = long_featmat.query('"bluelight" in bluelight and @candidate_genes in worm_gene or @CONTROL_STRAIN in worm_gene')
+    
+    fainter_df = []
+    for c, g in enumerate(candidate_genes):
+        
+        _test = [g, 'N2']
+        gene_locs = bluelight_fainters.query('@_test in worm_gene').index
+        
+        for w in bluelight_window_dict:
+            window_locs = bluelight_fainters.loc[gene_locs].query('window == @w').index
+            window_feats, scores, support = k_significant_feat(bluelight_fainters.loc[window_locs, paused_feats],
+                                                               bluelight_fainters.loc[window_locs, 'worm_gene'].values,
+                                                               k=20,
+                                                               plot=False)
+            
+            print(g, w, window_feats[:3])
+            fainter_df.append(pd.DataFrame({'worm_gene':g,
+                                    'window':w,
+                                    'top20':list(window_feats),
+                                   }))
+            del window_feats, scores, support
+
+
+    fainter_df = pd.concat(fainter_df)
+    fainter_df['window_light'] = fainter_df.window.map(bluelight_window_dict)
+    fainter_df.reset_index(drop=True,
+                           inplace=True)
+    
+    # for c,g in candidate_genes:
+    #     (SAVETO / 'pairwise_stats_test' / 'paused_feats' / g).mkdir(exist_ok=True)        
+    for p in ['prelight', 'bluelight', 'postlight']:
+        paused_feats = list(fainter_df.query('@p in window_light').drop_duplicates(subset='top20')['top20'])
+
+        for w in paused_feats:
+            plt.figure()
+            ax = sns.pointplot(x='window',
+                                y=w,
+                                data=bluelight_fainters,
+                                order=bluelight_window_dict.keys(),
+                                hue='worm_gene',
+                                showfliers=False,
+                                linestyle=['-'],
+                                ci=95,
+                                alpha=0.8,
+                                palette='pastel'
+                                # palette=[cmap[n2_index]],
+                                #         cmap[c]
+                                          )
+            y_min = ax.axes.get_ylim()[0]
+            y_max = ax.axes.get_ylim()[1]
+            rects = (patches.Rectangle((0.5, y_min), 1, y_max, facecolor='b', alpha=0.3),
+                     patches.Rectangle((3.5, y_min), 1, y_max, facecolor='b', alpha=0.3),
+                     patches.Rectangle((6.5, y_min), 1, y_max, facecolor='b', alpha=0.3))
+
+            [ax.add_patch(r) for r in rects]
+            plt.savefig(SAVETO / 'pairwise_stats_test' / 'paused_feats'/ '{}_{}.png'.format(p, w))
+            plt.close('all')
+ 
+    
     # if pairwise_stats:
     #     (SAVETO / 'pairwise_stats_test').mkdir(exist_ok=True)
 
