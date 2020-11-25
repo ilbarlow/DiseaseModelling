@@ -321,7 +321,7 @@ def plot_stimuli(ax=None, units='s', fps=25,
         rect = plt.Rectangle(xy=(ss, ymin),
                              width=stimulus_duration,
                              height=yrange,
-                             alpha=0.2,
+                             alpha=0.1,
                              facecolor=(0, 0, 1))
         ax.add_patch(rect)
     return
@@ -410,6 +410,7 @@ def load_bluelight_timeseries_from_results(
     # loop on video, select which wells need to be read
     for gcounter, (gname, md_group) in tqdm(enumerate(metadata_g)):
         # checks and extract variables out
+        
         md_group[CATEG_COLS]
         # plate_id = get_value_from_const_column(md_group, 'imaging_plate_id')
         # date = get_value_from_const_column(md_group, 'date_yyyymmdd')
@@ -419,8 +420,12 @@ def load_bluelight_timeseries_from_results(
         wells_to_read = list(md_group['well_name'])
         # read data
         data = read_timeseries(filename, only_wells=wells_to_read)
+       
         # filter bad worm trajectories
         data = filter_timeseries(data)
+        if data.empty:
+            print('No data in {}, {}, {}'.format(gcounter, gname, md_group))
+            continue
         # add plate id and date and worm strain
         data = pd.merge(data, md_group[CATEG_COLS], how='left', on='well_name')
         data['date_yyyymmdd'] = data['date_yyyymmdd'].astype(str)
@@ -430,8 +435,12 @@ def load_bluelight_timeseries_from_results(
         # extract the hires features
         hires_data = data[CATEG_COLS + HIRES_COLS].copy()
         # downsample the main df
+        # try:
+            
         data = downsample_timeseries(data, fps=25, time_bin_s=1)
-
+        #     continue
+        # except Exception:
+        #     print(gname, md_group, gcounter)
         # create a single unique well id
         hires_data['well_id'] = make_well_id(hires_data)
         data['well_id'] = make_well_id(data)
@@ -546,5 +555,57 @@ def get_float64_cols(df):
     idx = df.dtypes == 'float64'
     return df.dtypes[idx].index
 
+#%%
+if __name__ == "__main__":
+    RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
+    METADATA_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/AuxiliaryFiles/wells_annotated_metadata.csv')
+    CONTROL_STRAIN = 'N2'
+    CANDIDATE_GENE='cat-2'
+    from helper import select_strains, make_colormaps, strain_gene_dict, DATES_TO_DROP
+    from ts_helper import align_bluelight_meta
+     
+    timeseries_fname = RAW_DATA_DIR/ 'Results' / '{}_timeseries.hdf5'.format(CANDIDATE_GENE)
+    is_reload_timeseries_from_results = True
 
+    
+    meta = pd.read_csv(METADATA_FILE, index_col=None)  
+    assert meta.worm_strain.unique().shape[0] == meta.worm_gene.unique().shape[0]
+    meta.loc[:,'date_yyyymmdd'] = meta['date_yyyymmdd'].apply(lambda x: str(int(x)))     
+    #drop nan wells
+    meta.dropna(axis=0,
+                subset=['worm_gene'],
+                inplace=True)   
+    # remove data from dates to exclude
+    good_date = meta.query('@DATES_TO_DROP not in imaging_date_yyyymmdd').index
+    # bad wells
+    good_wells_from_gui = meta.query('is_bad_well == False').index
+    meta = meta.loc[good_wells_from_gui & good_date,:]
+    
+    # only select strains of interest
+    meta, idx, gene_list = select_strains(CANDIDATE_GENE,
+                                          CONTROL_STRAIN,
+                                          meta_df=meta,
+                                          feat_df=None)        
+    strain_lut, stim_lut = make_colormaps(gene_list,
+                                            idx,
+                                            CANDIDATE_GENE,
+                                            CONTROL_STRAIN,
+                                            featlist=[])
+    #strain to gene dictionary
+    strain_dict = strain_gene_dict(meta)
+    gene_dict = {v:k for k,v in strain_dict.items()}
 
+    meta = align_bluelight_meta(meta)
+    
+    if is_reload_timeseries_from_results:
+        # this uses tierpytools under the hood
+        timeseries_df, hires_df  = load_bluelight_timeseries_from_results(
+                            meta,
+                            RAW_DATA_DIR / 'Results')
+                            # save to disk
+        timeseries_df.to_hdf(timeseries_fname, 'timeseries_df', format='table')
+        hires_df.to_hdf(timeseries_fname, 'hires_df', format='table')
+    else:  # from disk, then add columns
+        # dataframe from the saved file
+        timeseries_df = pd.read_hdf(timeseries_fname, 'timeseries_df')
+        hires_df = pd.read_hdf(timeseries_fname, 'hires_df')

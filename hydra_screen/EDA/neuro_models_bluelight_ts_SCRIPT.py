@@ -373,8 +373,10 @@ if __name__ == '__main__':
             motion_mode_by_well)
         for col in ['frac_worms_bw_ci', 'frac_worms_st_ci',
                     'frac_worms_fw_ci', 'frac_worms_nan_ci']:
+            
             frac_motion_mode_with_ci[col+'_lower'] = \
                 frac_motion_mode_with_ci[col].apply(lambda x: x[0])
+            
             frac_motion_mode_with_ci[col+'_upper'] = \
                 frac_motion_mode_with_ci[col].apply(lambda x: x[1])
             frac_motion_mode_with_ci.drop(columns=col, inplace=True)

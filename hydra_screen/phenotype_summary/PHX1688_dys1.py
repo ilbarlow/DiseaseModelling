@@ -1,19 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Nov 12 16:23:42 2020
+Created on Fri Nov 20 13:35:17 2020
 
 @author: ibarlow
-
-script to investigate cat-4 phenotypes
-
-Import just cat-4 and N2 data to compare the features and find 
-independent, simple and concise features
-
-Look at prestim and poststim independentally
 """
-
-
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -39,7 +30,7 @@ from plotting_helper import  (plot_colormaps,
                               feature_box_plots,
                               window_errorbar_plots)
 
-ANALYSIS_TYPE = 'all_stim' # 'timeseries' # 'all_stim' 'bluelight'
+ANALYSIS_TYPE =  'timeseries' #'bluelight' 'all_stim'
 exploratory=False
 is_reload_timeseries_from_results = True
 is_recalculate_frac_motion_modes = True
@@ -52,20 +43,15 @@ RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
 WINDOW_FILES = RAW_DATA_DIR / 'Results' /'window_summaries'
 
 CONTROL_STRAIN = 'N2'
-CANDIDATE_GENE='cat-4'
+CANDIDATE_GENE = 'dys-1'
 
 SAVETO = FEAT_FILE.parent.parent.parent / 'Figures' / 'paper_figures' / CANDIDATE_GENE
 SAVETO.mkdir(exist_ok=True)
 feat256_fname = Path('/Users/ibarlow/tierpsy-tools-python/tierpsytools/extras/feat_sets/tierpsy_256.csv')
 
-selected_feats = ['length_50th_poststim',
-                  'curvature_std_midbody_abs_50th_poststim',
-                  'd_curvature_std_midbody_abs_50th_poststim']
-# # setting up features set types
-# feat256 = []
-# with open(feat256_fname, 'r', encoding='utf-8-sig') as fid:
-#     for l in fid.readlines():
-#         feat256.append(l.rstrip().lstrip())
+selected_feats = ['curvature_std_head_norm_abs_50th_prestim',
+                     'curvature_mean_head_norm_abs_50th_bluelight',
+                     'minor_axis_50th_poststim']
 
 #%%
 if __name__ == '__main__':
@@ -343,11 +329,15 @@ if __name__ == '__main__':
                         'abs_angular_velocity_head_tip',
                         'abs_angular_velocity_tail_tip']
         
-        plot_strains_ts(timeseries_df, strain_lut, CONTROL_STRAIN, feats_toplot, SAVETO / 'ts_plots')
+        plot_strains_ts(timeseries_df, 
+                        strain_lut,
+                        CONTROL_STRAIN,
+                        feats_toplot,
+                        SAVETO / 'ts_plots')
         
         #%% motion modes
         # get motion_mode stats
-                
+        tic = time.time()     
         if is_recalculate_frac_motion_modes:
             motion_modes, frac_motion_modes_with_ci = get_motion_modes(hires_df,
                                                                         saveto=timeseries_fname
@@ -360,29 +350,29 @@ if __name__ == '__main__':
 
    
         # %% make some nicer plotes with confindence intervals using luigi's bootstrapping
-        tic = time.time()
         
-        if is_recalculate_frac_motion_modes:
-            frac_motion_mode_with_ci = get_frac_motion_modes_with_ci(
-                motion_modes)
-            for col in ['frac_worms_bw_ci', 'frac_worms_st_ci',
-                        'frac_worms_fw_ci', 'frac_worms_nan_ci']:
-                frac_motion_mode_with_ci[col+'_lower'] = \
-                    frac_motion_mode_with_ci[col].apply(lambda x: x[0])
-                frac_motion_mode_with_ci[col+'_upper'] = \
-                    frac_motion_mode_with_ci[col].apply(lambda x: x[1])
-                frac_motion_mode_with_ci.drop(columns=col, inplace=True)
         
-            frac_motion_mode_with_ci.to_hdf(timeseries_fname,
-                                            'frac_motion_mode_with_ci',
-                                            format='table')
-        else:
-            frac_motion_mode_with_ci = pd.read_hdf(timeseries_fname,
-                                                   'frac_motion_mode_with_ci')
+        # if is_recalculate_frac_motion_modes:
+        #     frac_motion_mode_with_ci = get_frac_motion_modes_with_ci(
+        #         motion_modes)
+        #     for col in ['frac_worms_bw_ci', 'frac_worms_st_ci',
+        #                 'frac_worms_fw_ci', 'frac_worms_nan_ci']:
+        #         frac_motion_mode_with_ci[col+'_lower'] = \
+        #             frac_motion_mode_with_ci[col].apply(lambda x: x[0])
+        #         frac_motion_mode_with_ci[col+'_upper'] = \
+        #             frac_motion_mode_with_ci[col].apply(lambda x: x[1])
+        #         frac_motion_mode_with_ci.drop(columns=col, inplace=True)
+        
+        #     frac_motion_mode_with_ci.to_hdf(timeseries_fname,
+        #                                     'frac_motion_mode_with_ci',
+        #                                     format='table')
+        # else:
+        #     frac_motion_mode_with_ci = pd.read_hdf(timeseries_fname,
+        #                                            'frac_motion_mode_with_ci')
         
         fps = 25
-        frac_motion_mode_with_ci = frac_motion_mode_with_ci.reset_index()
-        frac_motion_mode_with_ci['time_s'] = (frac_motion_mode_with_ci['timestamp']
+        frac_motion_modes_with_ci = frac_motion_modes_with_ci.reset_index()
+        frac_motion_modes_with_ci['time_s'] = (frac_motion_modes_with_ci['timestamp']
                                               / fps)
         print('Time elapsed: {}s'.format(time.time()-tic))
         

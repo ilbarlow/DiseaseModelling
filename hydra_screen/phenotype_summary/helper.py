@@ -11,9 +11,8 @@ plots
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy import stats
+# from scipy import stats
 
 from tierpsytools.read_data.hydra_metadata import read_hydra_metadata, align_bluelight_conditions
 
@@ -28,6 +27,16 @@ STIMULI_ORDER = {'prestim':1,
                  'bluelight':2,
                  'poststim':3}
 
+BLUELIGHT_WINDOW_DICT = {0: 'prelight',
+                        1: 'bluelight',
+                        2: 'postlight',
+                        3: 'prelight',
+                        4: 'bluelight',
+                        5: 'postlight',
+                        6: 'prelight',
+                        7: 'bluelight',
+                        8: 'postlight'}
+
 def drop_nan_worms(feat, meta, saveto, export_nan_worms=False):
 
     # remove (and check) nan worms
@@ -39,6 +48,7 @@ def drop_nan_worms(feat, meta, saveto, export_nan_worms=False):
     if export_nan_worms:
         nan_worms.to_csv(saveto / 'nan_worms.csv',
                           index=False)
+    print('{} nan worms'.format(nan_worms.shape[0]))
     feat = feat.drop(index=nan_worms.index)
     meta = meta.drop(index=nan_worms.index)
 
@@ -80,12 +90,12 @@ def read_disease_data(feat_file, fname_file, metadata_file, drop_nans=True, expo
                                             meta,
                                             how='inner') #removes wells that don't have all 3 conditions
     if drop_nans:
-        drop_nan_worms(feat, meta, saveto=feat_file.parent)
+        feat, meta = drop_nan_worms(feat, meta, saveto=feat_file.parent)
     
     return feat, meta
 
 
-def select_strains(candidate_gene, control_strain, feat_df, meta_df):
+def select_strains(candidate_gene, control_strain, meta_df, feat_df=pd.DataFrame()):
     """
 
     Parameters
@@ -110,6 +120,7 @@ def select_strains(candidate_gene, control_strain, feat_df, meta_df):
     
     gene_list = [g for g in meta_df.worm_gene.unique() if g != control_strain]
     gene_list = [g for g in gene_list if 'myo' not in g and 'unc-54' not in g]
+    gene_list.sort()
        
     idx = [c for c,g in list(enumerate(gene_list)) if  g==candidate_gene]
     locs = list(meta_df.query('@candidate_gene in worm_gene').index)
@@ -118,12 +129,15 @@ def select_strains(candidate_gene, control_strain, feat_df, meta_df):
 
      #Only do analysis on the disease strains
     meta_df = meta_df.loc[locs,:]
-    feat_df = feat_df.loc[locs,:]
+    if feat_df.empty:
+        return meta_df, idx, gene_list
+    else:
+        feat_df = feat_df.loc[locs,:]
     
-    return feat_df, meta_df, idx, gene_list
+        return feat_df, meta_df, idx, gene_list
 
 
-def filter_features(feat_df, meta_df):
+def filter_features(feat_df, meta_df, dates_to_drop=DATES_TO_DROP):
     """
 
     Parameters
@@ -139,8 +153,6 @@ def filter_features(feat_df, meta_df):
         DESCRIPTION.
     meta_df : TYPE
         DESCRIPTION.
-    featlist : TYPE
-        DESCRIPTION.
     featsets : TYPE
         DESCRIPTION.
 
@@ -149,7 +161,8 @@ def filter_features(feat_df, meta_df):
     miss = meta_df[imgst_cols].isna().any(axis=1)
 
     # remove data from dates to exclude
-    bad_date = meta_df.date_yyyymmdd == float(DATES_TO_DROP)
+    bad_date = meta_df.date_yyyymmdd == float(dates_to_drop)
+   
     # bad wells
     good_wells_from_gui = meta_df.is_bad_well == False
     feat_df = feat_df.loc[good_wells_from_gui & ~bad_date & ~miss,:]
@@ -225,43 +238,14 @@ def make_colormaps(gene_list, idx, candidate_gene, CONTROL_STRAIN, featlist):
     
     stim_cmap = sns.color_palette('Pastel1',3)
     stim_lut = dict(zip(STIMULI_ORDER.keys(), stim_cmap))
-    feat_lut = {f:v for f in featlist for k,v in stim_lut.items() if k in f}
-
+    
+    if len(featlist)==0:
+        return strain_lut, stim_lut
+    
+    
+    feat_lut = {f:v for f in featlist for k,v in stim_lut.items() if k in f} 
     return strain_lut, stim_lut, feat_lut
 
-def plot_colormaps(strain_lut, stim_lut, saveto):
-    """
-    
-
-    Parameters
-    ----------
-    strain_lut : TYPE
-        DESCRIPTION.
-    stim_lut : TYPE
-        DESCRIPTION.
-    saveto : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
-    """
-    sns.set_style('dark')
-    fig, ax = plt.subplots(1,2, figsize = [10,2])
-    # ax=ax.flatten()
-    for c, (axis, lut) in enumerate([(ax[0], strain_lut), (ax[1], stim_lut)]):
-        axis.imshow([[v for v in lut.values()]])
-        axis.axes.set_xticks(range(0, len(lut), 1))
-        axis.axes.set_xticklabels(lut.keys(), rotation=90, fontsize=12)
-        axis.axes.set_yticklabels([])
-    fig.tight_layout()
-    if saveto==None:
-        return
-    else:
-        fig.savefig(saveto / 'colormaps.png')
-        
-    return
     
     
 # def write_ordered_features(clusterfeats, saveto):
@@ -272,59 +256,55 @@ def plot_colormaps(strain_lut, stim_lut, saveto):
             
 #     return
 
-def make_clustermaps(featZ, meta, featsets, strain_lut, feat_lut, saveto, group_vars=['worm_gene','imaging_date_yyyymmdd']):
+
+def find_window(fname):
+    import re
+    window_regex = r"(?<=_window_)\d{0,9}"
+    window = int(re.search(window_regex, str(fname))[0])
+    return window
+
+def strain_gene_dict(meta):
     """
     
 
     Parameters
     ----------
-    featZ : TYPE
-        DESCRIPTION.
     meta : TYPE
         DESCRIPTION.
-    featsets : TYPE
-        DESCRIPTION.
-    strain_lut : TYPE
-        DESCRIPTION.
-    feat_lut : TYPE
-        DESCRIPTION.
-    saveto : TYPE
-        DESCRIPTION.
-    group_vars : TYPE, optional
-        DESCRIPTION. The default is ['worm_gene','imaging_date_yyyymmdd'].
 
     Returns
     -------
-    clustered_features : TYPE
+    strain_dict : TYPE
         DESCRIPTION.
 
     """
-    featZ_grouped = pd.concat([featZ,
-                               meta],
-                              axis=1
-                              ).groupby(group_vars).mean()
-    featZ_grouped.reset_index(inplace=True)
+    strain_dict = {r.worm_strain : r.worm_gene for
+             i,r in meta[['worm_strain',
+                        'worm_gene']].drop_duplicates().iterrows()
+           }
+    return strain_dict
+
+
+
+if __name__ == '__main__':
+    FEAT_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/features_summary_tierpsy_plate_20200930_125752.csv')
+    FNAME_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/filenames_summary_tierpsy_plate_20200930_125752.csv')
+    METADATA_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/AuxiliaryFiles/wells_annotated_metadata.csv')
     
-    row_colors = featZ_grouped['worm_gene'].map(strain_lut)
-    col_colors = featZ_grouped[featsets['all']].columns.map(feat_lut)
+    CONTROL_STRAIN = 'N2'
+    CANDIDATE_GENE='cat-2'
     
-    # make clustermaps
-    clustered_features = {}
+    SAVETO = FEAT_FILE.parent.parent.parent / 'Figures' / 'paper_figures' / CANDIDATE_GENE
+    SAVETO.mkdir(exist_ok=True)
+    feat256_fname = Path('/Users/ibarlow/tierpsy-tools-python/tierpsytools/extras/feat_sets/tierpsy_256.csv')
+
+    feat, meta = read_disease_data(FEAT_FILE,
+                                   FNAME_FILE,
+                                   METADATA_FILE,
+                                   export_nan_worms=False)
     
-    for stim, fset in featsets.items():
-        cg = sns.clustermap(featZ_grouped[fset],
-                        row_colors=row_colors,
-                        col_colors=col_colors,
-                        vmin=-2,
-                        vmax=2
-                        )
-        cg.ax_heatmap.axes.set_xticklabels([])
-        cg.ax_heatmap.axes.set_yticklabels([])
-        if saveto!=None:          
-            cg.savefig(Path(saveto) / '{}_clustermap.png'.format(stim))
-        
-        clustered_features[stim] = np.array(featsets[stim])[cg.dendrogram_col.reordered_ind]
-        plt.close('all')
-        
-    return clustered_features
+    feat, meta, idx, gene_list = select_strains(CANDIDATE_GENE,
+                                                CONTROL_STRAIN,
+                                                feat,
+                                                meta)
         

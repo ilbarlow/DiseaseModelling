@@ -1,19 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Nov 12 16:23:42 2020
+Created on Mon Nov 16 15:00:36 2020
 
 @author: ibarlow
-
-script to investigate cat-4 phenotypes
-
-Import just cat-4 and N2 data to compare the features and find 
-independent, simple and concise features
-
-Look at prestim and poststim independentally
 """
-
-
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -39,10 +30,11 @@ from plotting_helper import  (plot_colormaps,
                               feature_box_plots,
                               window_errorbar_plots)
 
-ANALYSIS_TYPE = 'all_stim' # 'timeseries' # 'all_stim' 'bluelight'
+ANALYSIS_TYPE =  'all_stim' # 'bluelight' 'all_stim' 'timeseries'
 exploratory=False
 is_reload_timeseries_from_results = True
 is_recalculate_frac_motion_modes = True
+k_sig_feats = False
 
 FEAT_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/features_summary_tierpsy_plate_20200930_125752.csv')
 FNAME_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/filenames_summary_tierpsy_plate_20200930_125752.csv')
@@ -52,20 +44,15 @@ RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
 WINDOW_FILES = RAW_DATA_DIR / 'Results' /'window_summaries'
 
 CONTROL_STRAIN = 'N2'
-CANDIDATE_GENE='cat-4'
+CANDIDATE_GENE='pink-1'
 
 SAVETO = FEAT_FILE.parent.parent.parent / 'Figures' / 'paper_figures' / CANDIDATE_GENE
 SAVETO.mkdir(exist_ok=True)
 feat256_fname = Path('/Users/ibarlow/tierpsy-tools-python/tierpsytools/extras/feat_sets/tierpsy_256.csv')
 
-selected_feats = ['length_50th_poststim',
-                  'curvature_std_midbody_abs_50th_poststim',
-                  'd_curvature_std_midbody_abs_50th_poststim']
-# # setting up features set types
-# feat256 = []
-# with open(feat256_fname, 'r', encoding='utf-8-sig') as fid:
-#     for l in fid.readlines():
-#         feat256.append(l.rstrip().lstrip())
+selected_features = ['curvature_mean_head_w_forward_abs_50th_bluelight',
+                     'length_50th_prestim',
+                     'speed_head_base_w_forward_50th_bluelight']
 
 #%%
 if __name__ == '__main__':
@@ -109,33 +96,34 @@ if __name__ == '__main__':
         plt.close('all')
                 
         #%% k significant features for each prestim, bluelight and poststim
-        (SAVETO / 'ksig_feats').mkdir(exist_ok=True)
-        sns.set_style('white')
-        label_format = '{:.4f}'
-        kfeats = {}
-        for stim, fset in featsets.items():
-            kfeats[stim], scores, support = k_significant_feat(
-                feat_nonan[fset],
-                meta.worm_gene,
-                k=100,
-                plot=False)
-            
-            for i in range(0,5):
-                fig, ax = plt.subplots(4, 5, sharex=True, figsize = [20,20])
-                for c, axis in enumerate(ax.flatten()):
-                    counter=(20*i)-(20-c)
-                    sns.boxplot(x=meta['worm_gene'],
-                                y=feat[kfeats[stim][counter]],
-                                palette=strain_lut.values(),
-                                ax=axis)
-                    axis.set_ylabel(fontsize=8, ylabel=kfeats[stim][counter])
-                    axis.set_yticklabels(labels = [label_format.format(x) for x in axis.get_yticks()], fontsize=6)
-                    axis.set_xlabel('')
-                plt.tight_layout()
-                fig.fontsize=11
-                plt.savefig(SAVETO / 'ksig_feats' / '{}_{}_ksig_feats.png'.format(i*20, stim),
-                            dpi=400)
-                plt.close('all')
+        if k_sig_feats:
+            (SAVETO / 'ksig_feats').mkdir(exist_ok=True)
+            sns.set_style('white')
+            label_format = '{:.4f}'
+            kfeats = {}
+            for stim, fset in featsets.items():
+                kfeats[stim], scores, support = k_significant_feat(
+                    feat_nonan[fset],
+                    meta.worm_gene,
+                    k=100,
+                    plot=False)
+                
+                for i in range(0,5):
+                    fig, ax = plt.subplots(4, 5, sharex=True, figsize = [20,20])
+                    for c, axis in enumerate(ax.flatten()):
+                        counter=(20*i)-(20-c)
+                        sns.boxplot(x=meta['worm_gene'],
+                                    y=feat[kfeats[stim][counter]],
+                                    palette=strain_lut.values(),
+                                    ax=axis)
+                        axis.set_ylabel(fontsize=8, ylabel=kfeats[stim][counter])
+                        axis.set_yticklabels(labels = [label_format.format(x) for x in axis.get_yticks()], fontsize=6)
+                        axis.set_xlabel('')
+                    plt.tight_layout()
+                    fig.fontsize=11
+                    plt.savefig(SAVETO / 'ksig_feats' / '{}_{}_ksig_feats.png'.format(i*20, stim),
+                                dpi=400)
+                    plt.close('all')
         
         #%% pairwise statistics to find features that are different from N2
         
@@ -154,10 +142,10 @@ if __name__ == '__main__':
         if not exploratory:
             (SAVETO / 'heatmaps').mkdir(exist_ok=True)
         
-            clustered_barcodes(clustered_features, selected_feats, featZ, meta, bhP_values, SAVETO / 'heatmaps')
+            clustered_barcodes(clustered_features, selected_features, featZ, meta, bhP_values, SAVETO / 'heatmaps')
         
             # and make nice plots of the selected figures
-            for f in selected_feats:
+            for f in selected_features:
                 feature_box_plots(f, feat, meta, bhP_values, strain_lut)
                 plt.savefig(SAVETO / '{}_boxplot.png'.format(f), dpi=200)
     
@@ -343,7 +331,11 @@ if __name__ == '__main__':
                         'abs_angular_velocity_head_tip',
                         'abs_angular_velocity_tail_tip']
         
-        plot_strains_ts(timeseries_df, strain_lut, CONTROL_STRAIN, feats_toplot, SAVETO / 'ts_plots')
+        plot_strains_ts(timeseries_df, 
+                        strain_lut,
+                        CONTROL_STRAIN,
+                        feats_toplot,
+                        SAVETO / 'ts_plots')
         
         #%% motion modes
         # get motion_mode stats
