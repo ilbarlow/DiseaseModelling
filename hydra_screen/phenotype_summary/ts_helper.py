@@ -149,9 +149,9 @@ def plot_ts_features(plot_df, feature, strain_lut):
     None.
 
     """
-    
+    from textwrap import wrap
     # with PdfPages(SAVETO / '{}_downsampled_feats.pdf'.format(ng), keep_empty=False) as pdf:
-    fig, ax = plt.subplots(figsize=(10,5))
+    fig, ax = plt.subplots(figsize=(7.5,5))
     sns.lineplot(x='time_binned_s',
                  y=feature,
                  # style='motion_mode',
@@ -163,6 +163,7 @@ def plot_ts_features(plot_df, feature, strain_lut):
                  # legend='full',
                  palette=strain_lut)
     plot_stimuli(ax=ax, units='s')
+    ax.set_ylabel(ylabel='\n'.join(wrap(feature, 30)))
     plt.tight_layout()
                 
     return
@@ -224,7 +225,7 @@ def plot_frac(df,
                   'frac_worms_st': ':',
                   'frac_worms_bw': '--',
                   'frac_worms_nan': '-'}
-    plt.figure(figsize=(10,5))
+    plt.figure(figsize=(7.5,5))
 
     for col in modecolnames:
         plt.plot(df['time_s'],
@@ -250,6 +251,7 @@ def plot_frac(df,
         plt.ylim((0, 1))
         plt.legend(loc='upper right')
         plot_stimuli(units='s')
+        plt.tight_layout()
     return
 
 

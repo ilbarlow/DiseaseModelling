@@ -322,7 +322,7 @@ def plot_stimuli(ax=None, units='s', fps=25,
                              width=stimulus_duration,
                              height=yrange,
                              alpha=0.1,
-                             facecolor=(0, 0, 1))
+                             facecolor='tab:blue')
         ax.add_patch(rect)
     return
 

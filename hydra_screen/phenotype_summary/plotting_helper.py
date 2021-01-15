@@ -15,18 +15,16 @@ import sys
 sys.path.insert(0, '/Users/ibarlow/Documents/GitHub/pythonScripts/DiseaseModelling/hydra_screen/phenotype_summary')
 
 from helper import STIMULI_ORDER, BLUELIGHT_WINDOW_DICT
+CUSTOM_STYLE = '/Users/ibarlow/Documents/GitHub/pythonScripts/DiseaseModelling/hydra_screen/phenotype_summary/gene_cards.mplstyle'
+plt.style.use(CUSTOM_STYLE)
 
-def plot_colormaps(strain_lut, stim_lut, saveto):
+
+def plot_colormap(lut):
     """
-    
 
     Parameters
     ----------
-    strain_lut : TYPE
-        DESCRIPTION.
-    stim_lut : TYPE
-        DESCRIPTION.
-    saveto : TYPE
+    lut : TYPE
         DESCRIPTION.
 
     Returns
@@ -34,21 +32,71 @@ def plot_colormaps(strain_lut, stim_lut, saveto):
     None.
 
     """
+    
+    from matplotlib import transforms
+    tr = transforms.Affine2D().rotate_deg(90)
     sns.set_style('dark')
-    fig, ax = plt.subplots(1,2, figsize = [10,2])
-    # ax=ax.flatten()
-    for c, (axis, lut) in enumerate([(ax[0], strain_lut), (ax[1], stim_lut)]):
-        axis.imshow([[v for v in lut.values()]])
-        axis.axes.set_xticks(range(0, len(lut), 1))
-        axis.axes.set_xticklabels(lut.keys(), rotation=90, fontsize=12)
-        axis.axes.set_yticklabels([])
-    fig.tight_layout()
-    if saveto==None:
-        return
-    else:
-        fig.savefig(saveto / 'colormaps.png')
+    plt.style.use(CUSTOM_STYLE)
+    
+    fig, ax = plt.subplots(1,1,
+                           figsize=[4,5],
+                         )
+    ax.imshow([[v for v in lut.values()]],
+               transform=tr + ax.transData)
+    ax.axes.set_ylim([-0.5, 0.5+len(lut.keys())-1])
+    ax.axes.set_yticks(range(0,len(lut.keys())))
+    ax.axes.set_yticklabels(lut.keys())
+    
+    ax.axes.set_xlim([0.5, -0.5])
+    ax.set_xticklabels([])
+    
+    return ax
+    
+
+# def plot_colormaps(strain_lut, stim_lut, saveto):
+#     """
+    
+
+#     Parameters
+#     ----------
+#     strain_lut : TYPE
+#         DESCRIPTION.
+#     stim_lut : TYPE
+#         DESCRIPTION.
+#     saveto : TYPE
+#         DESCRIPTION.
+
+#     Returns
+#     -------
+#     None.
+
+#     """
+#     from matplotlib import transforms
+#     tr = transforms.Affine2D().rotate_deg(90)
+#     sns.set_style('dark')
+#     plt.style.use(CUSTOM_STYLE)
+    
+#     fig, ax = plt.subplots(2,1,
+#                            figsize=[4,10],
+#                            gridspec_kw={'height_ratios': [1,1]})
+#     # ax=ax.flatten()
+#     for c, (axis, lut) in enumerate([(ax[0], strain_lut), (ax[1], stim_lut)]):
+#         axis.imshow([[v for v in lut.values()]],
+#                     transform=tr + axis.transData)
+#         axis.axes.set_ylim([-0.5, 0.5+len(lut.keys())-1])
+#         axis.axes.set_yticks(range(0,len(lut.keys())))
+#         axis.axes.set_yticklabels(lut.keys())
         
-    return
+#         axis.axes.set_xlim([0.5, -0.5])
+#         axis.set_xticklabels([])
+
+#     # fig.tight_layout()
+#     if saveto==None:
+#         return
+#     else:
+#         fig.savefig(saveto / 'colormaps.png')
+        
+#     return
 
 def make_clustermaps(featZ, meta, featsets, strain_lut, feat_lut, saveto, group_vars=['worm_gene','imaging_date_yyyymmdd']):
     """
@@ -75,6 +123,8 @@ def make_clustermaps(featZ, meta, featsets, strain_lut, feat_lut, saveto, group_
         DESCRIPTION.
 
     """
+    plt.style.use(CUSTOM_STYLE)
+    
     featZ_grouped = pd.concat([featZ,
                                meta],
                               axis=1
@@ -85,15 +135,15 @@ def make_clustermaps(featZ, meta, featsets, strain_lut, feat_lut, saveto, group_
     
     # make clustermaps
     clustered_features = {}
-    
+    sns.set(font_scale=1.2)
+    plt.figure(figsize=[7.5,5])
     for stim, fset in featsets.items():
         col_colors = featZ_grouped[fset].columns.map(feat_lut)
         cg = sns.clustermap(featZ_grouped[fset],
                         row_colors=row_colors,
                         col_colors=col_colors,
                         vmin=-2,
-                        vmax=2
-                        )
+                        vmax=2)
         cg.ax_heatmap.axes.set_xticklabels([])
         cg.ax_heatmap.axes.set_yticklabels([])
         if saveto!=None:          
@@ -125,9 +175,10 @@ def make_barcode(heatmap_df, selected_feats, cm=['inferno', 'inferno', 'Greys', 
 
     """
     from matplotlib.gridspec import GridSpec
-    font_settings = {'fontsize':14}
+    sns.set_style('ticks')
+    plt.style.use(CUSTOM_STYLE)
     
-    f = plt.figure(figsize= (20,5))
+    f = plt.figure(figsize= (20,3))
     gs = GridSpec(4, 1,
                   wspace=0,
                   hspace=0,
@@ -147,7 +198,8 @@ def make_barcode(heatmap_df, selected_feats, cm=['inferno', 'inferno', 'Greys', 
                     vmax=v[1])
         axis.set_yticklabels(labels=[ix],
                              rotation=0,
-                             fontsize=18)
+                              fontsize=20
+                             )
         
         if n>2:
             c = sns.color_palette('Pastel1',3)
@@ -162,13 +214,15 @@ def make_barcode(heatmap_df, selected_feats, cm=['inferno', 'inferno', 'Greys', 
                     vmax=v[1])
             axis.set_yticklabels(labels=[ix],
                                  rotation=0,
-                                 fontsize=18)
-        cbar_ax.set_yticklabels(labels = cbar_ax.get_yticklabels(), fontdict=font_settings)
-        f.tight_layout(rect=[0, 0, .9, 1])
+                                  fontsize=20
+                                 )
+        cbar_ax.set_yticklabels(labels = cbar_ax.get_yticklabels())#, fontdict=font_settings)
+        # f.tight_layout()
+        f.tight_layout(rect=[0, 0, 0.89, 1], w_pad=0.5)
 
     for sf in selected_feats:
         try:
-            axis.text(heatmap_df.columns.get_loc(sf), 1, '*', fontdict=font_settings)
+            axis.text(heatmap_df.columns.get_loc(sf), 1, '*')
         except KeyError:
             print('{} not in featureset'.format(sf))
     return f
@@ -196,10 +250,12 @@ def make_heatmap_df(fset, featZ, meta, p_vals):
     heatmap_df = [pd.concat([featZ,
                         meta],
                        axis=1
-                       ).groupby('worm_gene').mean()[fset]]
-                                                         
-    heatmap_df.append(-np.log10(p_vals[fset])) 
-    
+                       ).groupby('worm_strain').mean()[fset]]
+    try:
+        heatmap_df.append(-np.log10(p_vals[fset])) 
+    except TypeError:
+        heatmap_df.append(p_vals[fset])
+        
     _stim = pd.DataFrame(data=[i.split('_')[-1] for i in fset],
                          columns=['stim_type'])
     _stim['stim_type'] = _stim['stim_type'].map(STIMULI_ORDER)
@@ -233,7 +289,7 @@ def clustered_barcodes(clustered_feats_dict, selected_feats, featZ, meta, p_vals
     None.
 
     """
-    
+    plt.style.use(CUSTOM_STYLE)
     for stim, fset in clustered_feats_dict.items():
         
         heatmap_df = make_heatmap_df(fset, featZ, meta, p_vals)
@@ -242,7 +298,7 @@ def clustered_barcodes(clustered_feats_dict, selected_feats, featZ, meta, p_vals
         f.savefig(saveto / '{}_heatmap.png'.format(stim))
     return
 
-def feature_box_plots(feature, feat_df, meta_df, bhP_values_df, strain_lut, add_stats=True):
+def feature_box_plots(feature, feat_df, meta_df, strain_lut, bhP_values_df=None, add_stats=True):
     """
 
     Parameters
@@ -264,7 +320,9 @@ def feature_box_plots(feature, feat_df, meta_df, bhP_values_df, strain_lut, add_
 
     """
     from statannot import add_stat_annotation
-    label_format = '{0:.4g}'  
+    label_format = '{0:.4g}'
+    plt.style.use(CUSTOM_STYLE)
+    # sns.set_style('ticks')
     
     plt.figure(figsize=(5,10))
     ax = sns.boxplot(y=feature,
@@ -272,9 +330,10 @@ def feature_box_plots(feature, feat_df, meta_df, bhP_values_df, strain_lut, add_
                 data=pd.concat([feat_df, meta_df],
                                axis=1),
                 order=strain_lut.keys(),
-                palette=strain_lut.values())
-    ax.set_ylabel(fontsize=20, ylabel=feature)
-    ax.set_yticklabels(labels=[label_format.format(x) for x in ax.get_yticks()], fontsize=14) #labels = ax.get_yticks(), 
+                palette=strain_lut.values(),
+                showfliers=False)
+    # ax.set_ylabel(fontsize=20, ylabel=feature)
+    ax.set_yticklabels(labels=[label_format.format(x) for x in ax.get_yticks()])#, fontsize=16) #labels = ax.get_yticks(), 
     ax.set_xlabel('')
     ax.set_xticklabels(labels = '')
     if add_stats:
@@ -289,45 +348,67 @@ def feature_box_plots(feature, feat_df, meta_df, bhP_values_df, strain_lut, add_
                             pvalues=[bhP_values_df[feature].values[0]],
                             test=None,
                             text_format='star',
-                            loc='inside',
-                            verbose=2,
-                            fontsize=18)     
+                            loc='outside',
+                            verbose=2
+                            # fontsize=20
+                            )     
     plt.tight_layout()
     
     return
 
-def window_errorbar_plots(feature, feat, meta, cmap_lut, window_order, plot_legend=False):
+
+def window_errorbar_plots(feature, feat, meta, cmap_lut, plot_legend=False):
     import matplotlib.patches as patches
     from textwrap import wrap
     label_format = '{0:.4g}' 
-    plt.figure()
-    ax = sns.pointplot(x='window',
-                        y=feature,
-                        data=pd.concat([feat, meta], axis=1),
-                        order=window_order,
-                        hue='worm_gene',
-                        showfliers=False,
-                        linestyle=['-'],
-                        ci=95,
-                        alpha=0.8,
-                        palette=cmap_lut)
-    if not plot_legend:
-        ax.legend().remove()
-    ax.set_ylabel(fontsize=14,
-                  ylabel='\n'.join(wrap(feature, 30)))
+    plt.style.use(CUSTOM_STYLE)
+    
+    _window_grouped = pd.concat([feat,
+                                 meta],
+                                    axis=1).groupby(['window_sec',
+                                                     'worm_gene'])[feature].describe().reset_index()
+    fig, ax = plt.subplots()
+    for g in meta.worm_gene.unique():
+        
+        xs = _window_grouped.query('@g in worm_gene')['window_sec']
+        ys = _window_grouped.query('@g in worm_gene')['mean']
+        yerr = _window_grouped.query('@g in worm_gene')['mean'] / (_window_grouped.query('@g in worm_gene')['count'])**0.5 #['std'] / _windw
+        
+        plt.errorbar(xs,
+                     ys,
+                     yerr,
+                     fmt='-o',
+                     color=cmap_lut[g],
+                     alpha=0.8,
+                     linewidth=2,
+                     axes=ax
+                     )
+
+    ax.set_ylabel(fontsize=18,
+                  ylabel='\n'.join(wrap(feature, 25)))
     ax.set_yticklabels(labels=[label_format.format(x) for x in ax.get_yticks()],
-                       fontsize=14)
+                       fontsize=16
+                       )
     ax.set_xlabel(fontsize=14,
                   xlabel='window')
-    ax.set_xticklabels(labels=[BLUELIGHT_WINDOW_DICT[x] for x in ax.get_xticks()],
-                       fontsize=12,
-                       rotation=45)
+    # plt.xticks(ticks=[x[0] for x in BLUELIGHT_WINDOW_DICT.values()],
+    #            labels=[x[1] for x in BLUELIGHT_WINDOW_DICT.values()])
+    ax.set_xticks(ticks=xs)
+    ax.set_xticklabels(labels=[x[1] for x in BLUELIGHT_WINDOW_DICT.values()],
+                        fontsize=12,
+                        rotation=45)
     y_min = ax.axes.get_ylim()[0]
     y_max = ax.axes.get_ylim()[1]
     if y_min<y_max:
-        rects = (patches.Rectangle((0.5, y_min), 1, abs(y_min-y_max), facecolor='b', alpha=0.3),
-                 patches.Rectangle((3.5, y_min), 1, abs(y_min-y_max), facecolor='b', alpha=0.3),
-                 patches.Rectangle((6.5, y_min), 1, abs(y_min-y_max), facecolor='b', alpha=0.3))
+        rects = (patches.Rectangle((60, y_min), 10, abs(y_min-y_max),
+                                   facecolor='tab:blue',
+                                   alpha=0.3),
+                 patches.Rectangle((160, y_min), 10, abs(y_min-y_max),
+                                   facecolor='tab:blue',
+                                   alpha=0.3),
+                 patches.Rectangle((260, y_min), 10, abs(y_min-y_max),
+                                   facecolor='tab:blue',
+                                   alpha=0.3))
 
     [ax.add_patch(r) for r in rects]
 

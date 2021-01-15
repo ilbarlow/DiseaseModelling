@@ -15,6 +15,7 @@ import seaborn as sns
 # from scipy import stats
 
 from tierpsytools.read_data.hydra_metadata import read_hydra_metadata, align_bluelight_conditions
+from tierpsytools.preprocessing.filter_data import drop_ventrally_signed, filter_nan_inf, cap_feat_values, feat_filter_std 
 
 CONTROL_STRAIN = 'N2'
 DATES_TO_DROP = '20200626'
@@ -27,15 +28,17 @@ STIMULI_ORDER = {'prestim':1,
                  'bluelight':2,
                  'poststim':3}
 
-BLUELIGHT_WINDOW_DICT = {0: 'prelight',
-                        1: 'bluelight',
-                        2: 'postlight',
-                        3: 'prelight',
-                        4: 'bluelight',
-                        5: 'postlight',
-                        6: 'prelight',
-                        7: 'bluelight',
-                        8: 'postlight'}
+BLUELIGHT_WINDOW_DICT = {0: [55,'prelight'],
+                        1: [70, 'bluelight'],
+                        2: [80, 'postlight'],
+                        3: [155, 'prelight'],
+                        4: [170, 'bluelight'],
+                        5: [180, 'postlight'],
+                        6: [255, 'prelight'],
+                        7: [270, 'bluelight'],
+                        8: [280, 'postlight']}
+
+# BLUELIGHT_WINDOWS = [55, 70, 80, 155, 170, 180, 255, 270, 280]
 
 def drop_nan_worms(feat, meta, saveto, export_nan_worms=False):
 
@@ -124,7 +127,8 @@ def select_strains(candidate_gene, control_strain, meta_df, feat_df=pd.DataFrame
        
     idx = [c for c,g in list(enumerate(gene_list)) if  g==candidate_gene]
     locs = list(meta_df.query('@candidate_gene in worm_gene').index)
-    N2_locs = meta_df.query('@control_strain in worm_gene').sample(len(locs)).index
+    date_to_select = meta_df.loc[locs]['date_yyyymmdd'].unique()
+    N2_locs = list(meta_df.query('@date_to_select in date_yyyymmdd and @control_strain in worm_gene').index)
     locs.extend(N2_locs)
 
      #Only do analysis on the disease strains
@@ -164,23 +168,27 @@ def filter_features(feat_df, meta_df, dates_to_drop=DATES_TO_DROP):
     bad_date = meta_df.date_yyyymmdd == float(dates_to_drop)
    
     # bad wells
+    
     good_wells_from_gui = meta_df.is_bad_well == False
     feat_df = feat_df.loc[good_wells_from_gui & ~bad_date & ~miss,:]
     meta_df = meta_df.loc[good_wells_from_gui & ~bad_date & ~miss,:]
-    # remove features with too many nans
-    feat_df = feat_df.loc[:,
-                          feat_df.isna().sum(axis=0)/feat_df.shape[0]<BAD_FEAT_FILTER]
-    # remove wells with too many nans
-    feat_df = feat_df.loc[feat_df.isna().sum(axis=1)/feat_df.shape[0]<BAD_WELL_FILTER, :]
-    meta_df = meta_df.loc[feat_df.index,:]
-    # remove features with std=0
-    feat_df = feat_df.loc[:,
-                          feat_df.columns[feat_df.std(axis=0)!=0]]
+    
+    # remove features and wells with too many nans and std=0
+    feat_df = filter_nan_inf(feat_df,
+                             threshold=BAD_FEAT_FILTER,
+                             axis=0)
+    feat_df = filter_nan_inf(feat_df,
+                             threshold=BAD_WELL_FILTER,
+                              axis=1)
 
-     # feature sets
+    feat_df = feat_filter_std(feat_df)
+    feat_df = cap_feat_values(feat_df)
+    feat_df = drop_ventrally_signed(feat_df)
+    
+    meta_df = meta_df.loc[feat_df.index,:]
+    # feature sets
      # abs features no longer in tierpsy
     pathcurvature_feats = [x for x in feat_df.columns if 'path_curvature' in x]
-    
     #remove these features
     feat_df = feat_df.drop(columns=pathcurvature_feats)
     
@@ -245,7 +253,6 @@ def make_colormaps(gene_list, idx, candidate_gene, CONTROL_STRAIN, featlist):
     
     feat_lut = {f:v for f in featlist for k,v in stim_lut.items() if k in f} 
     return strain_lut, stim_lut, feat_lut
-
     
     
 # def write_ordered_features(clusterfeats, saveto):
@@ -284,7 +291,54 @@ def strain_gene_dict(meta):
            }
     return strain_dict
 
+def long_featmap(feat, meta, stim=['prestim', 'bluelight', 'poststim']):
+    """
+    Convert wide-form feature dataframe to longform
 
+    Parameters
+    ----------
+    feat : TYPE
+        DESCRIPTION.
+        
+    meta
+
+    Returns
+    -------
+    None.
+
+    """
+    featlist = list(feat.columns)
+    meta_cols = list(meta.columns)
+    long_featmat = []
+    long_meta = []
+    for st in stim:
+        stim_list = [f for f in featlist if st in f]
+        _featmat = pd.DataFrame(data=feat.loc[:,stim_list].values,
+                                columns=['_'.join(s.split('_')[:-1])
+                                           for s in stim_list],
+                                index=feat.index)
+        imgst_col = [i for i in meta_cols if all(['imgstore_name' in i, st in i])]
+
+        _meta = pd.concat([_featmat, meta], axis=1)[meta_cols]
+        _meta['bluelight'] = st
+        _meta['imgstore_name'] = _meta[imgst_col]
+        _meta.drop(columns=[i for i in meta_cols if 'imgstore_name_' in i],
+                    inplace=True)
+        _meta.reset_index(drop=True, inplace=True)
+        _featmat.reset_index(drop=True, inplace=True)
+        long_featmat.append(_featmat)
+        long_meta.append(_meta)
+
+    long_featmat = pd.concat(long_featmat,
+                             axis=0)
+    long_featmat.reset_index(drop=True,
+                             inplace=True)
+    long_meta = pd.concat(long_meta,
+                          axis=0)
+    long_meta.reset_index(drop=True,
+                          inplace=True)
+
+    return long_featmat, long_meta
 
 if __name__ == '__main__':
     FEAT_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/features_summary_tierpsy_plate_20200930_125752.csv')

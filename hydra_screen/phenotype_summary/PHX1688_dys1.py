@@ -12,7 +12,8 @@ import sys
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
-from tierpsytools.analysis.significant_features import k_significant_feat   
+from tierpsytools.analysis.significant_features import k_significant_feat
+
 import time   
 
 sys.path.insert(0, '/Users/ibarlow/Documents/GitHub/pythonScripts/DiseaseModelling/hydra_screen/phenotype_summary')
@@ -69,6 +70,8 @@ if __name__ == '__main__':
         
         feat, meta, featsets = filter_features(feat,
                                                meta)
+        
+        
         
         strain_lut, stim_lut, feat_lut = make_colormaps(gene_list,
                                                         idx,
