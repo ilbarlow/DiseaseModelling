@@ -185,7 +185,7 @@ def filter_features(feat_df, meta_df, dates_to_drop=DATES_TO_DROP):
     feat_df = cap_feat_values(feat_df)
     feat_df = drop_ventrally_signed(feat_df)
     
-    meta_df = meta_df.loc[feat_df.index,:]
+    meta_df = meta_df.iloc[feat_df.index,:]
     # feature sets
      # abs features no longer in tierpsy
     pathcurvature_feats = [x for x in feat_df.columns if 'path_curvature' in x]

@@ -27,6 +27,8 @@ from luigi_helper import (
     HIRES_COLS
     )
 
+MODECOLNAMES=['frac_worms_fw', 'frac_worms_st', 'frac_worms_bw']
+
 def align_bluelight_meta(metadata_df):
     # reshape the dataframe slightly so we only have one line per (plate,well)
     pre_df = metadata_df[metadata_df['imgstore_name'].str.contains('prestim')]
@@ -215,10 +217,10 @@ def get_motion_modes(hires_df,
     print('Time elapsed: {}s'.format(time.time()-tic))
     return motion_mode, frac_motion_mode_with_ci
 
-def plot_frac(df,
+def plot_frac_all_modes(df,
               strain,
               strain_lut,
-              modecolnames=['frac_worms_fw', 'frac_worms_st', 'frac_worms_bw']):
+              modecolnames=MODECOLNAMES):
               # ax=None,
               # **kwargs):
     styledict = {'frac_worms_fw': '-',
@@ -254,6 +256,44 @@ def plot_frac(df,
         plt.tight_layout()
     return
 
+def plot_frac_by_mode(df,
+                      strain_lut,
+                      modecolname=MODECOLNAMES[0]):
+                  # ax=None,
+                  # **kwargs):
+    # styledict = {'frac_worms_fw': '-',
+    #               'frac_worms_st': ':',
+    #               'frac_worms_bw': '--',
+    #               'frac_worms_nan': '-'}
+
+    plt.figure(figsize=(7.5,5))
+    
+    for strain in list(strain_lut.keys()):
+        plt.plot(df[df.worm_gene==strain]['time_s'],
+                    df[df.worm_gene==strain][modecolname],
+                    # ax=this_ax,
+                    color=strain_lut[strain],
+                    label=strain, #'_nolegend_',
+                    # linestyle=styledict[col],
+                    linewidth=2,
+                    alpha=0.8)#),
+
+        lower = df[df.worm_gene==strain][modecolname+'_ci_lower']
+        upper = df[df.worm_gene==strain][modecolname+'_ci_upper']
+        plt.fill_between(x=df[df.worm_gene==strain]['time_s'],
+                             y1=lower.values,
+                             y2=upper.values,
+                             alpha=0.3,
+                             facecolor=strain_lut[strain])
+
+        plt.ylabel('fraction of worms')
+        plt.xlabel('time, (s)')
+        plt.title(modecolname)
+        plt.ylim((0, 1))
+        plt.legend(loc='upper right')
+        plot_stimuli(units='s')
+        plt.tight_layout()
+    return
 
     
 

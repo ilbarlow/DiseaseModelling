@@ -30,8 +30,10 @@ from helper import (read_disease_data,
                     strain_gene_dict,
                     long_featmap,
                     BLUELIGHT_WINDOW_DICT,
-                    DATES_TO_DROP)
+                    DATES_TO_DROP,
+                    STIMULI_ORDER)
 from plotting_helper import  (plot_colormap,
+                              plot_cmap_text,
                               make_clustermaps,
                               clustered_barcodes,
                               feature_box_plots,
@@ -43,9 +45,11 @@ from ts_helper import (align_bluelight_meta,
                        plot_strains_ts,
                        get_motion_modes,
                         # get_frac_motion_modes_with_ci,
-                       plot_frac)
-
-ANALYSIS_TYPE = ['timeseries']# , 'timeseries']#, 'bluelight', ]
+                       plot_frac_all_modes,
+                       plot_frac_by_mode,
+                       MODECOLNAMES)
+N2_analysis=False
+ANALYSIS_TYPE = ['all_stim']# , 'timeseries']#, 'bluelight', ]
 motion_modes=True
 exploratory = False
 do_stats=False
@@ -61,9 +65,9 @@ RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
 WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries'
 
 CONTROL_STRAIN = 'N2'
-BAD_FEAT_THRESH = 3 # 3 standard deviations away from the mean
-BAD_FEAT_FILTER = 0.1 # 10% threshold for removing bad features
-BAD_WELL_FILTER = 0.3 # 30% threshold for bad well
+# BAD_FEAT_THRESH = 3 # 3 standard deviations away from the mean
+# BAD_FEAT_FILTER = 0.1 # 10% threshold for removing bad features
+# BAD_WELL_FILTER = 0.3 # 30% threshold for bad well
 
 strains_done = []#['add-1', 'bbs-2', 'C43B7.2', 'cat-2', 'glc-2', 'glr-1', 'gpb-2', 'mpx-1', 'nca-2','pink-1', 'snf-11', 'unc-43',  'unc-49', 'unc-77', ] #['mpz-1', 'snf-11', 'C43B7.2', 'unc-43'] add in myo and unc-54 here (.isin() method)
 
@@ -93,7 +97,60 @@ if __name__ == '__main__':
     genes = [g for g in genes if 'myo' not in g and 'unc-54' not in g]
 
     genes = list(set(genes) - set(strains_done))
+    strain_numbers = []
 
+#%% N2 analysis only
+    if N2_analysis:
+        feat_df, meta_df, idx, gene_list = select_strains('N2',
+                                                          CONTROL_STRAIN,
+                                                          feat_df=feat,
+                                                          meta_df=meta)
+        
+        feat_df.drop_duplicates(inplace=True)
+        meta_df.drop_duplicates(inplace=True)
+        
+        # filter features
+        feat_df, meta_df, featsets = filter_features(feat_df,
+                                                     meta_df)
+        
+        stim_cmap = sns.color_palette('Pastel1',3)
+        stim_lut = dict(zip(STIMULI_ORDER.keys(), stim_cmap))
+        
+        feat_lut = {f:v for f in featsets['all'] for k,v in stim_lut.items() if k in f} 
+        
+        feat_nonan = impute_nan_inf(feat_df)
+    
+        featZ = pd.DataFrame(data=stats.zscore(feat_nonan[featsets['all']], axis=0),
+                             columns=featsets['all'],
+                             index=feat_nonan.index)
+    
+        assert featZ.isna().sum().sum() == 0
+        
+        N2clustered_features = make_clustermaps(featZ,
+                                                meta_df,
+                                                featsets,
+                                                strain_lut={'N2': (0.6, 0.6, 0.6)},
+                                                feat_lut=feat_lut,
+                                                saveto=ROOT_DIR / 'Figures')
+        
+        #write these features to text files for future import
+        for k, v in N2clustered_features.items():
+            with open(ROOT_DIR / 'Figures' / 'N2_clustered_features_{}.txt'.format(k), 'w+') as fid:
+                for line in v:
+                    fid.write(line + '\n')
+        
+    else:
+        
+        N2clustered_features = {}
+        for fset in STIMULI_ORDER.keys():
+            N2clustered_features[k] = []
+            with open(ROOT_DIR / 'Figures' / 'N2_clustered_features_{}.txt'.format(k), 'r') as fid:
+                N2clustered_features[k] = [l.rstrip() for l in fid.readlines()]
+        
+        with open(ROOT_DIR / 'Figures' / 'N2_clustered_features_{}.txt'.format('all'), 'r') as fid:  
+            N2clustered_features['all'] = [l.rstrip() for l in fid.readlines()]
+                    
+#%%
     for count, g in enumerate(genes):
         #TODO add in the counting timer
         print('Analysing {} {}/{}'.format(g, count+1, len(genes)))
@@ -115,18 +172,28 @@ if __name__ == '__main__':
             feat_df, meta_df, featsets = filter_features(feat_df,
                                                          meta_df)
 
+            # strain_numbers.append(meta_df.groupby('worm_strain')['file_id_prestim'].describe()['count'])
+        
+
             strain_lut, stim_lut, feat_lut = make_colormaps(gene_list,
                                                             idx,
                                                             candidate_gene,
                                                             CONTROL_STRAIN,
                                                             featlist=featsets['all'])
-
+            
             # colorbars to map colors to strains
             plot_colormap(strain_lut)
             plt.savefig(saveto / 'strain_cmap.png')
-            plt.close('all')
-            ax = plot_colormap(stim_lut)
+            plot_cmap_text(strain_lut)
+            plt.savefig(saveto / 'strain_cmap_text.png')
+            
+            ax = plot_colormap(stim_lut, orientation='horizontal')
             plt.savefig(saveto / 'stim_cmap.png')
+            plot_cmap_text(stim_lut)
+            plt.savefig(saveto / 'stim_cmap_text.png')
+            
+            plt.close('all')
+
             #%%  fillnans and normalise by bluelight condition
             # long_feat, long_meta = long_featmap(feat_df,
             #                                     meta_df)
@@ -153,7 +220,7 @@ if __name__ == '__main__':
 
             #TODO should I use one of sklearns algorithms instead?
             clustered_features = make_clustermaps(featZ,
-                                                  meta,
+                                                  meta_df,
                                                   featsets,
                                                   strain_lut,
                                                   feat_lut,
@@ -195,6 +262,7 @@ if __name__ == '__main__':
             # pairwise statistics to find features that are different from N2
             else:
                 (saveto / 'heatmaps').mkdir(exist_ok=True)
+                (saveto / 'heatmaps_N2ordered').mkdir(exist_ok=True)
                 (saveto / 'boxplots').mkdir(exist_ok=True)
 
                 if do_stats:
@@ -216,6 +284,8 @@ if __name__ == '__main__':
                 else:
                     bhP_values = pd.read_csv(saveto / '{}_stats.csv'.format(candidate_gene),
                                              index_col=False)
+                    bhP_values.rename(mapper={0:'p<0.05'},
+                                      inplace=True)
                 #%%
 
                 #import the selected features
@@ -230,12 +300,19 @@ if __name__ == '__main__':
                     all_stim_selected_feats.extend([f for f in featsets['all'] if '_'.join(s.split('_')[:-1])=='_'.join(f.split('_')[:-1])])
 
                 # nice figure with single barcode for each strains, and asterisks of signficicantly different features
-
+                
                 clustered_barcodes(clustered_features, selected_feats,
                                    featZ,
-                                   meta,
+                                   meta_df,
                                    bhP_values,
                                    saveto / 'heatmaps')
+                
+                #use N2 ordered features
+                clustered_barcodes(N2clustered_features, selected_feats,
+                                   featZ,
+                                   meta_df,
+                                   bhP_values,
+                                   saveto / 'heatmaps_N2ordered')
 
                 # and make nice plots of the selected figures
                 for f in  all_stim_selected_feats:
@@ -413,34 +490,34 @@ if __name__ == '__main__':
 
             # %%% hand-picked features from the downsampled dataframe
 
-            plt.close('all')
-            (saveto / 'ts_plots').mkdir(exist_ok=True)
-            feats_toplot = ['speed',
-                            'abs_speed',
-                            'angular_velocity',
-                            'abs_angular_velocity',
-                            'relative_to_body_speed_midbody',
-                            'abs_relative_to_body_speed_midbody',
-                            'abs_relative_to_neck_angular_velocity_head_tip',
-                            'speed_tail_base',
-                            'length',
-                            'major_axis',
-                            'd_speed',
-                            'head_tail_distance',
-                            'abs_angular_velocity_neck',
-                            'abs_angular_velocity_head_base',
-                            'abs_angular_velocity_hips',
-                            'abs_angular_velocity_tail_base',
-                            'abs_angular_velocity_midbody',
-                            'abs_angular_velocity_head_tip',
-                            'abs_angular_velocity_tail_tip']
+            # plt.close('all')
+            # (saveto / 'ts_plots').mkdir(exist_ok=True)
+            # feats_toplot = ['speed',
+            #                 'abs_speed',
+            #                 'angular_velocity',
+            #                 'abs_angular_velocity',
+            #                 'relative_to_body_speed_midbody',
+            #                 'abs_relative_to_body_speed_midbody',
+            #                 'abs_relative_to_neck_angular_velocity_head_tip',
+            #                 'speed_tail_base',
+            #                 'length',
+            #                 'major_axis',
+            #                 'd_speed',
+            #                 'head_tail_distance',
+            #                 'abs_angular_velocity_neck',
+            #                 'abs_angular_velocity_head_base',
+            #                 'abs_angular_velocity_hips',
+            #                 'abs_angular_velocity_tail_base',
+            #                 'abs_angular_velocity_midbody',
+            #                 'abs_angular_velocity_head_tip',
+            #                 'abs_angular_velocity_tail_tip']
 
-            plot_strains_ts(timeseries_df,
-                            strain_lut,
-                            CONTROL_STRAIN,
-                            feats_toplot,
-                            saveto / 'ts_plots')
-            plt.close('all')
+            # plot_strains_ts(timeseries_df,
+            #                 strain_lut,
+            #                 CONTROL_STRAIN,
+            #                 feats_toplot,
+            #                 saveto / 'ts_plots')
+            # plt.close('all')
             #%% motion modes
             # get motion_mode stats
             tic = time.time()
@@ -461,6 +538,12 @@ if __name__ == '__main__':
             print('Time elapsed: {}s'.format(time.time()-tic))
 
             # %% make some nicer plotes with confindence intervals using luigi's bootstrapping
-            for ii, (strain, df_g) in enumerate(frac_motion_modes_with_ci.groupby('worm_gene')):
-                plot_frac(df_g, strain, strain_lut)
-                plt.savefig(saveto / '{}_motion_modes.png'.format(strain), dpi=200)
+            # for ii, (strain, df_g) in enumerate(frac_motion_modes_with_ci.groupby('worm_gene')):
+            #     plot_frac_all_modes(df_g, strain, strain_lut)
+            #     plt.savefig(saveto / '{}_motion_modes.png'.format(strain), dpi=200)
+            #%%
+            # plot each motion mode separately
+            for motion_mode in MODECOLNAMES:
+                plot_frac_by_mode(frac_motion_modes_with_ci, strain_lut, modecolname=motion_mode)
+                plt.savefig(saveto / '{}_ts.png'.format(motion_mode), dpi=200)
+

@@ -19,7 +19,7 @@ CUSTOM_STYLE = '/Users/ibarlow/Documents/GitHub/pythonScripts/DiseaseModelling/h
 plt.style.use(CUSTOM_STYLE)
 
 
-def plot_colormap(lut):
+def plot_colormap(lut, orientation='vertical'):
     """
 
     Parameters
@@ -32,26 +32,74 @@ def plot_colormap(lut):
     None.
 
     """
-    
-    from matplotlib import transforms
-    tr = transforms.Affine2D().rotate_deg(90)
     sns.set_style('dark')
     plt.style.use(CUSTOM_STYLE)
     
-    fig, ax = plt.subplots(1,1,
-                           figsize=[4,5],
-                         )
-    ax.imshow([[v for v in lut.values()]],
-               transform=tr + ax.transData)
-    ax.axes.set_ylim([-0.5, 0.5+len(lut.keys())-1])
-    ax.axes.set_yticks(range(0,len(lut.keys())))
-    ax.axes.set_yticklabels(lut.keys())
+    from matplotlib import transforms
+    if orientation == 'vertical':
+        tr = transforms.Affine2D().rotate_deg(90)
+        
+        
+        fig, ax = plt.subplots(1,1,
+                               figsize=[4,5],
+                             )
+        ax.imshow([[v for v in lut.values()]],
+                   transform=tr + ax.transData)
+        ax.axes.set_ylim([-0.5, 0.5+len(lut.keys())-1])
+        ax.axes.set_yticks(range(0,len(lut.keys())))
+        ax.axes.set_yticklabels(lut.keys())
+        
+        ax.axes.set_xlim([0.5, -0.5])
+        ax.set_xticklabels([])
     
-    ax.axes.set_xlim([0.5, -0.5])
-    ax.set_xticklabels([])
-    
+    else:
+        fig, ax = plt.subplots(1,1,
+                               figsize=[5,2],
+                             )
+        ax.imshow([[v for v in lut.values()]])
+        ax.axes.set_xticks(range(0, len(lut), 1))
+        ax.axes.set_xticklabels(lut.keys(),
+                                rotation=45,
+                                fontsize=12)
+        ax.axes.set_yticklabels([])
+        fig.tight_layout()
+        
     return ax
     
+
+def plot_cmap_text(lut):
+    """
+    Plot text as colour
+
+    Parameters
+    ----------
+    lut : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    fig, axes = plt.subplots(len(lut),
+                           1,
+                               figsize=[4,5],
+                             )
+    # fig.axes.get_xaxis().set_visible(False)
+    # fig.axes.get_yaxis().set_visible(False)
+    
+    for c, (ax, t) in enumerate(zip(axes, lut.items())):
+        ax.text(y=0.5,
+                x=0.5,
+                s=t[0],
+                color=t[1],
+                verticalalignment='center',
+                horizontalalignment='center',
+                fontsize=60)
+        ax.axis("off")
+
+    return
+
 
 # def plot_colormaps(strain_lut, stim_lut, saveto):
 #     """
@@ -178,12 +226,13 @@ def make_barcode(heatmap_df, selected_feats, cm=['inferno', 'inferno', 'Greys', 
     sns.set_style('ticks')
     plt.style.use(CUSTOM_STYLE)
     
-    f = plt.figure(figsize= (20,3))
+    f = plt.figure(figsize= (24,3))
     gs = GridSpec(4, 1,
                   wspace=0,
                   hspace=0,
                   height_ratios=[3,3,1,1])
-    cbar_ax = f.add_axes([.91, .3, .03, .4])
+    cbar_axes = [f.add_axes([.89, .3, .02, .4]), [],
+               f.add_axes([.935, .3, .02, .4]),[]]
 
     for n, ((ix,r), c, v) in enumerate(zip(heatmap_df.iterrows(), cm, vmin_max)):  
         axis = f.add_subplot(gs[n])
@@ -192,8 +241,8 @@ def make_barcode(heatmap_df, selected_feats, cm=['inferno', 'inferno', 'Greys', 
                     xticklabels=[],
                     ax=axis,
                     cmap=c,
-                    cbar=n==0, #only plots colorbar for first plot
-                    cbar_ax=None if n else cbar_ax,
+                    cbar=n==0 or n==2, #only plots colorbar for first plot
+                    cbar_ax=cbar_axes[n],#None if n else cbar_axes[n],
                     vmin=v[0],
                     vmax=v[1])
         axis.set_yticklabels(labels=[ix],
@@ -209,20 +258,25 @@ def make_barcode(heatmap_df, selected_feats, cm=['inferno', 'inferno', 'Greys', 
                     ax=axis,
                     cmap=c,
                     cbar=n==0, 
-                    cbar_ax=None if n else cbar_ax,
+                    cbar_ax=None if n else cbar_axes[n],
                     vmin=v[0],
                     vmax=v[1])
             axis.set_yticklabels(labels=[ix],
                                  rotation=0,
                                   fontsize=20
                                  )
-        cbar_ax.set_yticklabels(labels = cbar_ax.get_yticklabels())#, fontdict=font_settings)
+        cbar_axes[0].set_yticklabels(labels=cbar_axes[0].get_yticklabels())#, fontdict=font_settings)
+        cbar_axes[2].set_yticklabels(labels=['>0.05',
+                                             np.power(10,-vmin_max[2][1]/2),
+                                             np.power(10,-float(vmin_max[2][1]))
+                                             ]
+                                     ) #TODO set max values for this colorbar
         # f.tight_layout()
         f.tight_layout(rect=[0, 0, 0.89, 1], w_pad=0.5)
 
     for sf in selected_feats:
         try:
-            axis.text(heatmap_df.columns.get_loc(sf), 1, '*')
+            axis.text(heatmap_df.columns.get_loc(sf), 1, '*', fontsize=20)
         except KeyError:
             print('{} not in featureset'.format(sf))
     return f
