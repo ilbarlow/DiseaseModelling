@@ -27,6 +27,9 @@ from luigi_helper import (
     HIRES_COLS
     )
 
+CUSTOM_STYLE = '/Users/ibarlow/Documents/GitHub/pythonScripts/DiseaseModelling/hydra_screen/phenotype_summary/gene_cards.mplstyle'
+plt.style.use(CUSTOM_STYLE)
+
 MODECOLNAMES=['frac_worms_fw', 'frac_worms_st', 'frac_worms_bw']
 
 def align_bluelight_meta(metadata_df):
@@ -267,6 +270,9 @@ def plot_frac_by_mode(df,
     #               'frac_worms_nan': '-'}
 
     plt.figure(figsize=(7.5,5))
+    mode_dict = {'frac_worms_fw':'forward',
+                 'frac_worms_bw':'backward',
+                 'frac_worms_st': 'stationary'}
     
     for strain in list(strain_lut.keys()):
         plt.plot(df[df.worm_gene==strain]['time_s'],
@@ -288,7 +294,7 @@ def plot_frac_by_mode(df,
 
         plt.ylabel('fraction of worms')
         plt.xlabel('time, (s)')
-        plt.title(modecolname)
+        plt.title(mode_dict[modecolname])
         plt.ylim((0, 1))
         plt.legend(loc='upper right')
         plot_stimuli(units='s')

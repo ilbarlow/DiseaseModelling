@@ -5,7 +5,7 @@ Created on Thu Nov 12 15:31:14 2020
 
 @author: ibarlow
 
-Helper functions for reading the disease data and making strain specific 
+Helper functions for reading the disease data and making strain specific
 plots
 """
 import pandas as pd
@@ -15,7 +15,7 @@ import seaborn as sns
 # from scipy import stats
 
 from tierpsytools.read_data.hydra_metadata import read_hydra_metadata, align_bluelight_conditions
-from tierpsytools.preprocessing.filter_data import drop_ventrally_signed, filter_nan_inf, cap_feat_values, feat_filter_std 
+from tierpsytools.preprocessing.filter_data import drop_ventrally_signed, filter_nan_inf, cap_feat_values, feat_filter_std
 
 CONTROL_STRAIN = 'N2'
 DATES_TO_DROP = '20200626'
@@ -28,15 +28,15 @@ STIMULI_ORDER = {'prestim':1,
                  'bluelight':2,
                  'poststim':3}
 
-BLUELIGHT_WINDOW_DICT = {0: [55,'prelight'],
-                        1: [70, 'bluelight'],
-                        2: [80, 'postlight'],
-                        3: [155, 'prelight'],
-                        4: [170, 'bluelight'],
-                        5: [180, 'postlight'],
-                        6: [255, 'prelight'],
-                        7: [270, 'bluelight'],
-                        8: [280, 'postlight']}
+BLUELIGHT_WINDOW_DICT = {0: [55,'prelight',1],
+                        1: [70, 'bluelight',1],
+                        2: [80, 'postlight',1],
+                        3: [155, 'prelight',2],
+                        4: [170, 'bluelight',2],
+                        5: [180, 'postlight',2],
+                        6: [255, 'prelight',3],
+                        7: [270, 'bluelight',3],
+                        8: [280, 'postlight',3]}
 
 # BLUELIGHT_WINDOWS = [55, 70, 80, 155, 170, 180, 255, 270, 280]
 
@@ -59,7 +59,7 @@ def drop_nan_worms(feat, meta, saveto, export_nan_worms=False):
 
 def read_disease_data(feat_file, fname_file, metadata_file, drop_nans=True, export_nan_worms=False):
     """
-    
+
     Parameters
     ----------
     feat_file : TYPE
@@ -79,22 +79,30 @@ def read_disease_data(feat_file, fname_file, metadata_file, drop_nans=True, expo
         DESCRIPTION.
 
     """
-    feat = pd.read_csv(feat_file,
-                       comment='#')
-    fname = pd.read_csv(fname_file,
-                        comment='#')
-    meta = pd.read_csv(metadata_file, index_col=None)
-    assert meta.worm_strain.unique().shape[0] == meta.worm_gene.unique().shape[0]  
+    # feat = pd.read_csv(feat_file,
+    #                    comment='#')
+    # fname = pd.read_csv(fname_file,
+    #                     comment='#')
+    # meta = pd.read_csv(metadata_file, index_col=None)
+    # meta['imaging_date_yyymmdd'] = pd.to_datetime(meta.imaging_date_yyyymmdd,
+    #                                               format='%Y%m%d').dt.date
     
-    feat, meta = read_hydra_metadata(feat,
-                                     fname,
-                                     meta)
+    # assert meta.worm_strain.unique().shape[0] == meta.worm_gene.unique().shape[0]
+
+    feat, meta = read_hydra_metadata(feat_file,
+                                     fname_file,
+                                     metadata_file)
+    meta['imaging_date_yyyymmdd'] = pd.to_datetime(meta.imaging_date_yyyymmdd,
+                                                  format='%Y%m%d').dt.date
+    
+    assert meta.worm_strain.unique().shape[0] == meta.worm_gene.unique().shape[0]
+    
     feat, meta = align_bluelight_conditions(feat,
                                             meta,
                                             how='inner') #removes wells that don't have all 3 conditions
     if drop_nans:
         feat, meta = drop_nan_worms(feat, meta, saveto=feat_file.parent)
-    
+
     return feat, meta
 
 
@@ -120,12 +128,19 @@ def select_strains(candidate_gene, control_strain, meta_df, feat_df=pd.DataFrame
         DESCRIPTION.
 
     """
-    
+
     gene_list = [g for g in meta_df.worm_gene.unique() if g != control_strain]
     gene_list = [g for g in gene_list if 'myo' not in g and 'unc-54' not in g]
     gene_list.sort()
-       
-    idx = [c for c,g in list(enumerate(gene_list)) if  g==candidate_gene]
+    
+    # if len(candidate_gene) <=1:
+    #     idx = [c for c,g in list(enumerate(gene_list)) if  g==candidate_gene]
+    # else:
+    if control_strain not in candidate_gene:
+        idx = [gene_list.index(item) for item in candidate_gene]
+    else:
+        idx=[]
+        
     locs = list(meta_df.query('@candidate_gene in worm_gene').index)
     date_to_select = meta_df.loc[locs]['date_yyyymmdd'].unique()
     N2_locs = list(meta_df.query('@date_to_select in date_yyyymmdd and @control_strain in worm_gene').index)
@@ -137,7 +152,7 @@ def select_strains(candidate_gene, control_strain, meta_df, feat_df=pd.DataFrame
         return meta_df, idx, gene_list
     else:
         feat_df = feat_df.loc[locs,:]
-    
+
         return feat_df, meta_df, idx, gene_list
 
 
@@ -166,13 +181,13 @@ def filter_features(feat_df, meta_df, dates_to_drop=DATES_TO_DROP):
 
     # remove data from dates to exclude
     bad_date = meta_df.date_yyyymmdd == float(dates_to_drop)
-   
+
     # bad wells
-    
+
     good_wells_from_gui = meta_df.is_bad_well == False
     feat_df = feat_df.loc[good_wells_from_gui & ~bad_date & ~miss,:]
     meta_df = meta_df.loc[good_wells_from_gui & ~bad_date & ~miss,:]
-    
+
     # remove features and wells with too many nans and std=0
     feat_df = filter_nan_inf(feat_df,
                              threshold=BAD_FEAT_FILTER,
@@ -184,28 +199,28 @@ def filter_features(feat_df, meta_df, dates_to_drop=DATES_TO_DROP):
     feat_df = feat_filter_std(feat_df)
     feat_df = cap_feat_values(feat_df)
     feat_df = drop_ventrally_signed(feat_df)
-    
-    meta_df = meta_df.iloc[feat_df.index,:]
+
+    meta_df = meta_df.loc[feat_df.index,:]
     # feature sets
      # abs features no longer in tierpsy
     pathcurvature_feats = [x for x in feat_df.columns if 'path_curvature' in x]
     #remove these features
     feat_df = feat_df.drop(columns=pathcurvature_feats)
-    
+
     featlist = list(feat_df.columns)
     # for f in featsets.keys():
     #     featsets[f] = [x for x in feat.columns if f in x]
     #     featsets[f] = list(set(featsets[f]) - set(pathcurvature_feats))
-    
+
     featsets={}
     for stim in STIMULI_ORDER.keys():
         featsets[stim] = [f for f in featlist if stim in f]
     featsets['all'] = featlist
-        
-    return feat_df, meta_df, featsets
-    
 
-def make_colormaps(gene_list, idx, candidate_gene, CONTROL_STRAIN, featlist):
+    return feat_df, meta_df, featsets
+
+
+def make_colormaps(gene_list, featlist, idx=[], candidate_gene=None, CONTROL_DICT={CONTROL_STRAIN:(0.6, 0.6, 0.6)}):
     """
 
     Parameters
@@ -235,32 +250,44 @@ def make_colormaps(gene_list, idx, candidate_gene, CONTROL_STRAIN, featlist):
         DESCRIPTION.
 
     """
-    
+
     cmap = list(np.flip((sns.color_palette('cubehelix',
                                            len(gene_list)*2+6))[3:-4:2]))
-    N2_cmap = (0.6, 0.6, 0.6) 
-    strain_cmap = [cmap[idx[0]], N2_cmap]
-    strain_lut = dict(zip([candidate_gene,
-                           CONTROL_STRAIN],
-                          strain_cmap))
-    
+    # N2_cmap = (0.6, 0.6, 0.6)
+
+    strain_lut = {}
+    strain_lut[CONTROL_STRAIN] = CONTROL_DICT[CONTROL_STRAIN]
+
+    if candidate_gene is not None:
+        for c,g in enumerate(candidate_gene):
+            strain_lut[g] = cmap[idx[c]]
+
+        # dict(zip([candidate_gene,
+        #                        CONTROL_STRAIN],
+        #                       strain_cmap))
+    else:
+        # cmap.append(N2_cmap)
+        # gene_list.append(CONTROL_STRAIN)
+        strain_lut.update(dict(zip(gene_list,
+                              cmap)))
+
     stim_cmap = sns.color_palette('Pastel1',3)
     stim_lut = dict(zip(STIMULI_ORDER.keys(), stim_cmap))
-    
+
     if len(featlist)==0:
         return strain_lut, stim_lut
-    
-    
-    feat_lut = {f:v for f in featlist for k,v in stim_lut.items() if k in f} 
+
+
+    feat_lut = {f:v for f in featlist for k,v in stim_lut.items() if k in f}
     return strain_lut, stim_lut, feat_lut
-    
-    
+
+
 # def write_ordered_features(clusterfeats, saveto):
 #     Path(saveto).touch(exist_ok=False)
 #     with open(saveto, 'w') as fid:
 #         for l in clusterfeats:
-#             fid.writelines(l + ',\n') 
-            
+#             fid.writelines(l + ',\n')
+
 #     return
 
 
@@ -272,7 +299,7 @@ def find_window(fname):
 
 def strain_gene_dict(meta):
     """
-    
+
 
     Parameters
     ----------
@@ -299,7 +326,7 @@ def long_featmap(feat, meta, stim=['prestim', 'bluelight', 'poststim']):
     ----------
     feat : TYPE
         DESCRIPTION.
-        
+
     meta
 
     Returns
@@ -344,10 +371,10 @@ if __name__ == '__main__':
     FEAT_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/features_summary_tierpsy_plate_20200930_125752.csv')
     FNAME_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/filenames_summary_tierpsy_plate_20200930_125752.csv')
     METADATA_FILE = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/AuxiliaryFiles/wells_annotated_metadata.csv')
-    
+
     CONTROL_STRAIN = 'N2'
     CANDIDATE_GENE='cat-2'
-    
+
     SAVETO = FEAT_FILE.parent.parent.parent / 'Figures' / 'paper_figures' / CANDIDATE_GENE
     SAVETO.mkdir(exist_ok=True)
     feat256_fname = Path('/Users/ibarlow/tierpsy-tools-python/tierpsytools/extras/feat_sets/tierpsy_256.csv')
@@ -356,9 +383,8 @@ if __name__ == '__main__':
                                    FNAME_FILE,
                                    METADATA_FILE,
                                    export_nan_worms=False)
-    
+
     feat, meta, idx, gene_list = select_strains(CANDIDATE_GENE,
                                                 CONTROL_STRAIN,
                                                 feat,
                                                 meta)
-        
