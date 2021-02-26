@@ -31,12 +31,14 @@ from helper import (read_disease_data,
                     filter_features,
                     make_colormaps,
                     strain_gene_dict,
+                    select_strains,
                     BLUELIGHT_WINDOW_DICT,
                     DATES_TO_DROP,
                     STIMULI_ORDER)
 from plotting_helper import (CUSTOM_STYLE,
                              make_clustermaps,
-                             plot_cmap_text)
+                             plot_cmap_text,
+                             feature_box_plots)
 
 ROOT_DIR = Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen')
 FEAT_FILE =  Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/eleni_filters/features_summary_tierpsy_plate_filtered_traj_compiled.csv') #list(ROOT_DIR.rglob('*filtered/features_summary_tierpsy_plate_20200930_125752.csv'))[0] #Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/eleni_filtered/features_summary_tierpsy_plate_filtered_traj_compiled.csv')# #Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/summary_results_files/filtered/features_summary_tierpsy_plate_20200930_125752.csv')
@@ -48,7 +50,15 @@ WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries'
 
 CONTROL_STRAIN = 'N2'
 
-saveto = ROOT_DIR / 'summary_figures'
+EXAMPLES = {'curvature_head_norm_abs_50th_prestim': ['bbs-1',
+                                                      'avr-14'],
+             'speed_midbody_norm_50th_prestim': ['glr-1',
+                                                 'unc-80'],
+             'relative_to_body_radial_velocity_head_tip_w_forward_10th_poststim': ['cat-2',
+                                                                                  'glc-2']
+             }
+
+saveto = ROOT_DIR / 'Figures' / 'summary_figures'
 saveto.mkdir(exist_ok=True)
 
 #%%
@@ -86,7 +96,6 @@ if __name__ == '__main__':
     
     plot_cmap_text(strain_lut, 70)
     plt.savefig(saveto / 'strain_cmap.png', bbox_inches="tight", dpi=200)
-    plt.savefig(saveto / 'strain_cmap.svg', dpi=200)
     plt.close('all')
     
     # impute nans and inf and z score  
@@ -113,7 +122,7 @@ if __name__ == '__main__':
    
     #%% now get an idea of N2 robustness - measure CoV
     
-    genes.append(CONTROL_STRAIN)
+    # genes.append(CONTROL_STRAIN)
     
     cov_by_date = []
     for g in genes:
@@ -129,23 +138,45 @@ if __name__ == '__main__':
         cov_by_date.append(_feat_cov.to_frame().transpose())
 
     cov_by_date = pd.concat(cov_by_date)
-    cov_by_date.set_index('worm_gene',inplace=True)   
-            
+    cov_by_date.set_index('worm_gene',inplace=True)
+    
+    #find mean and std for cov for N2 by resampling
+    n_per_strains = meta.query('@genes in worm_gene').groupby('worm_gene').apply(len)
+    
+    #10 iterations of resampling
+    control_cov = []
+    for i in range(0,10):
+        _meta = meta_df.query('@CONTROL_STRAIN in worm_gene').sample(int(n_per_strains.mean()))
+        
+        _feat_grouped = pd.concat([feat_nonan.loc[list(_meta.index),:],
+                             _meta], axis=1).groupby('date_yyyymmdd').mean()
+        
+        _feat_cov = _feat_grouped[featsets['all']].apply(stats.variation).apply(np.abs)
+        # pd.Series(np.abs(stats.variation(_feat_grouped[featsets['all']])),
+        #                       index=featsets['all'])
+        control_cov.append(_feat_cov.to_frame().transpose())
+    
+    control_cov = pd.concat(control_cov)
+    
     fig, ax = plt.subplots(figsize=(10,8))
     # plt.errorbar(cov_by_date.index, cov_by_date.mean(axis=1), cov_by_date.std(axis=1)/(cov_by_date.shape[1]**-2))
-    cov_by_date.mean(axis=1).plot(color=(0.5, 0.5, 0.5))
+    cov_by_date.mean(axis=1).plot(color=(0.2, 0.2, 0.2))
     ax.set_xticks(range(0, len(genes)))  
     ax.set_xticklabels(labels=genes,
                        rotation=90)
     ax.set_ylabel('Coefficient of Variation')
     
-    plt.plot(np.zeros(len(genes))+cov_by_date.loc['N2'].mean(),
-             '.', color='magenta')
+    plt.plot(np.zeros(len(genes))+control_cov.mean(axis=1).mean(),
+             '--', color=strain_lut[CONTROL_STRAIN])
+    plt.fill_between([x.get_text() for x in ax.axes.xaxis.get_ticklabels()],
+                     np.zeros(len(genes))+control_cov.mean(axis=1).mean() - control_cov.mean(axis=1).std(),
+                     np.zeros(len(genes))+control_cov.mean(axis=1).mean() + control_cov.mean(axis=1).std(),
+                     color=strain_lut[CONTROL_STRAIN],
+                     alpha=0.7)
     plt.tight_layout()
     plt.savefig(saveto / 'coefficient_of_variation.png', dpi=300)
     plt.savefig(saveto / 'coefficient_of_variation.svg', dpi=300)
 
-    
     # %% PCA plots by strain - prestim, bluelight and poststim separately
     
     # do PCA on entire space and plot worms as they travel through
@@ -274,3 +305,34 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.savefig(saveto / 'PC3PC4_trajectory_space.png', dpi=400)
     # plt.savefig(saveto / 'PC3PC4_trajectory_space.svg', dpi=400)
+    
+     #%% plot the example features
+    # and make nice plots of the selected figures
+    
+    for k,v in EXAMPLES.items():
+        examples_feat_df, examples_meta_df, dx, gene_list = select_strains(v,
+                                                                            CONTROL_STRAIN,
+                                                                            feat_df=feat,
+                                                                            meta_df=meta)
+    
+        # filter features
+        examples_feat_df, examples_meta_df, featsets = filter_features(examples_feat_df,
+                                                     examples_meta_df)
+
+
+        examples_strain_lut = make_colormaps(gene_list,
+                                                featlist=featsets['all'],
+                                                idx=dx,
+                                                candidate_gene=v
+                                                )
+        examples_strain_lut = examples_strain_lut[0]
+    
+        feature_box_plots(k,
+                          examples_feat_df,
+                          examples_meta_df,
+                          examples_strain_lut,
+                          show_raw_data=False,
+                          add_stats=True)
+        plt.savefig(saveto / '{}_boxplot.png'.format(k),
+                    dpi=200)
+        # plt.close('all')

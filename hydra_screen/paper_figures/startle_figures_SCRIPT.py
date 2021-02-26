@@ -44,7 +44,7 @@ FNAME_FILE = list(ROOT_DIR.rglob('*filtered/filenames_summary_tierpsy_plate_2020
 METADATA_FILE = list(ROOT_DIR.rglob('*wells_annotated_metadata.csv'))[0] #Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/AuxiliaryFiles/wells_annotated_metadata.csv')
 
 RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
-WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries'
+WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries_newfilters'
 
 STARTLE_FEATURES = ['curvature_head_norm_abs_50th_prestim',
                      'speed_w_forward_50th_bluelight',
@@ -52,7 +52,8 @@ STARTLE_FEATURES = ['curvature_head_norm_abs_50th_prestim',
                      'motion_mode_forward_duration_50th_prestim',
                      'motion_mode_forward_fraction_prestim',
                      'motion_mode_forward_frequency_prestim',
-                     'speed_head_tip_50th_prestim'
+                     'speed_head_tip_50th_prestim',
+                     'relative_to_neck_radial_velocity_head_tip_norm_50th_prestim'
                     ]
 
 STARTLE_BLUELIGHT = ['speed_midbody_norm_90th_bluelight',
@@ -133,7 +134,7 @@ if __name__ == '__main__':
                           meta_df,
                           strain_lut,
                           show_raw_data=False,
-                          add_stats=False)
+                          add_stats=True)
         plt.savefig(saveto / '{}_boxplot.png'.format(f),
                     dpi=200)
         plt.close('all')

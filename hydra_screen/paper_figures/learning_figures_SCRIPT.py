@@ -44,7 +44,7 @@ FNAME_FILE = list(ROOT_DIR.rglob('*filtered/filenames_summary_tierpsy_plate_2020
 METADATA_FILE = list(ROOT_DIR.rglob('*wells_annotated_metadata.csv'))[0] #Path('/Users/ibarlow/OneDrive - Imperial College London/Documents/behavgenom_copy/DiseaseScreen/AuxiliaryFiles/wells_annotated_metadata.csv')
 
 RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
-WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries'
+WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries_newfilters'
 
 LEARNING_FEATURES = ['curvature_head_norm_abs_50th_prestim',
                     'relative_to_neck_radial_velocity_head_tip_10th_prestim',
@@ -135,7 +135,7 @@ if __name__ == '__main__':
                           feat_df,
                           meta_df,
                           strain_lut,
-                          show_raw_data=True,
+                          show_raw_data=False,
                           add_stats=True)
         plt.savefig(saveto / '{}_boxplot.png'.format(f),
                     dpi=200)

@@ -46,17 +46,17 @@ RAW_DATA_DIR = Path('/Volumes/Ashur Pro2/DiseaseScreen')
 WINDOW_FILES = RAW_DATA_DIR / 'Results' / 'window_summaries_newfilter'
 
 CILIA_FEATURES = ['length_50th_prestim',
-                'curvature_std_head_abs_50th_prestim',
-                'width_tail_base_norm_50th_poststim',
-                'd_curvature_std_midbody_w_paused_abs_50th_bluelight',
+                # 'curvature_std_head_abs_50th_prestim',
+                # 'width_tail_base_norm_50th_poststim',
+                # 'd_curvature_std_midbody_w_paused_abs_50th_bluelight',
                 'curvature_neck_norm_abs_50th_prestim',
-                'speed_midbody_norm_50th_prestim',
+                # 'speed_midbody_norm_50th_prestim',
                 'width_midbody_norm_50th_poststim',
-                'speed_midbody_50th_prestim',
+                # 'speed_midbody_50th_prestim',
                 'd_curvature_midbody_norm_abs_50th_poststim',
-                'curvature_head_norm_abs_50th_prestim',
-                'speed_midbody_10th_prestim',
-                'motion_mode_backward_frequency_bluelight'
+                # 'curvature_head_norm_abs_50th_prestim',
+                # 'speed_midbody_10th_prestim',
+                # 'motion_mode_backward_frequency_bluelight'
                     ]
 
 CILIA_BLUELIGHT = ['motion_mode_backward_fraction_bluelight',
