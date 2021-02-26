@@ -20,9 +20,9 @@ from tierpsytools.hydra.compile_metadata import populate_96WPs,\
 date_regex = r"\d{8}"
 
 ROOT_DIR = Path('/Volumes/behavgenom$/Tom/Data/Hydra/DiseaseModel/RawData')
-AUX_DIR = ROOT_DIR / 'AuxiliaryFiles' / 'manual_metadata'
+AUX_DIR = ROOT_DIR / 'AuxiliaryFiles'
 
-DRUG_PLATES = Path('/Volumes/behavgenom$/Tom/Data/Hydra/DiseaseModel/RawData/AuxiliaryFiles/manual_metadata/master_drug_plate_log.xlsx')
+DRUG_PLATES = Path('/Volumes/behavgenom$/Tom/Data/Hydra/DiseaseModel/RawData/AuxiliaryFiles/manual_metadata/source_plates.xlsx')
 
 # %% 
 if __name__=='__main__':
@@ -32,6 +32,8 @@ if __name__=='__main__':
     
     print('Calculating metadata for {} days of experiments'.format(
             len(day_root_dirs)))
+    
+    drug_plates = pd.read_excel(DRUG_PLATES)
     
     for count, day in enumerate(day_root_dirs):
         exp_date = re.findall(date_regex, str(day))[0]
@@ -47,15 +49,17 @@ if __name__=='__main__':
         plate_metadata = populate_96WPs(wormsorter_file,
                                         del_if_exists=True,
                                         saveto='default')
+        # print(day)
+        # print(number_wells_per_plate(plate_metadata, day))
         
         # bad_wells_df = convert_bad_wells_lut(bad_wells_file)
         
-        plate_metadata = pd.merge(plate_metadata,
-                                  bad_wells_df,
-                                  on=['imaging_plate_id', 'well_name'],
-                                  how='outer')
-        plate_metadata['is_bad_well'].fillna(False,
-                                             inplace=True)
+        # plate_metadata = pd.merge(plate_metadata,
+        #                           bad_wells_df,
+        #                           on=['imaging_plate_id', 'well_name'],
+        #                           how='outer')
+        # plate_metadata['is_bad_well'].fillna(False,
+        #                                      inplace=True)
         metadata_file = day / '{}_day_metadata.csv'.format(exp_date)
     
         print('Generating day metadata: {}'.format(
@@ -76,13 +80,11 @@ if __name__=='__main__':
                                             include_imgstore_name=False)
         
         day_metadata['source_plate_id'] = day_metadata['imaging_plate_id'
-                                                       ].apply(lambda x: '_'.join(x.split('_')[:-1]))
+                                                       ].apply(lambda x: '_'.join(x.split('_')[:-1]) if len(x.split('_'))>3 else x)
         day_metadata = pd.merge(day_metadata,
                                drug_plates,
-                               left_on=['source_plate_id',
+                               on=['source_plate_id',
                                         'well_name'],
-                               right_on=['shuffled_plate_id',
-                                         'destination_well'],
                                suffixes=('_day', '_robot'),
                                how='outer')
         day_metadata.drop(
@@ -90,6 +92,31 @@ if __name__=='__main__':
                         inplace=True)
            
         files_to_check = day_metadata_check(day_metadata, day, plate_size=48)
-        number_wells_per_plate(plate_metadata, day)
+        number_wells_per_plate(day_metadata, day)
         
         day_metadata.to_csv(metadata_file, index=False)
+#%%        
+    import datetime
+    # combine all the metadata files
+    concat_meta = concatenate_days_metadata(AUX_DIR,
+                                            list_days=None,
+                                            saveto=None)
+    
+    
+    concat_meta_grouped = concat_meta.groupby('worm_gene')
+
+    strains = pd.DataFrame(concat_meta_grouped.apply(lambda x: x.drop_duplicates(subset='worm_strain')))
+    strains.reset_index(drop=True,
+                        inplace=True)
+    
+    strains = strains[['worm_gene',
+                        'worm_strain',
+                        'worm_code',
+                        'date_yyyymmdd']]
+ 
+    strains.to_csv(AUX_DIR/ \
+                   '{}_strain_name_errors.csv'.format(
+                       datetime.datetime.today().strftime('%Y%m%d')
+                       ),
+                   index=False)
+        
